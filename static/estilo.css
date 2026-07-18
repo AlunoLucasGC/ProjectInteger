@@ -432,3 +432,161 @@ body {
         margin: 0 auto;
     }
 }
+
+/* ==========================================================================
+   ELEMENTOS EXCLUSIVOS DO PAINEL DO VENDEDOR (VERSÃO SEM NAVBAR)
+   ========================================================================== */
+.text-verde-safari {
+    color: var(--verde-safari);
+}
+
+.bg-verde-tag {
+    background-color: var(--borda-suave);
+    color: var(--verde-safari);
+    font-size: 10px;
+}
+
+body.bg-creme {
+    background-color: var(--fundo-creme);
+    /* Aumentado o padding inferior para o conteúdo não sumir atrás do novo container fixo */
+    padding-bottom: 200px; 
+}
+
+.panel-wrapper {
+    width: 100%;
+}
+
+.max-width-buttons {
+    max-width: 400px;
+}
+
+/* Botão Principal: Anunciar Manualmente */
+.btn-panel-primary {
+    background-color: var(--verde-safari) !important;
+    color: var(--branco-puro) !important;
+    border: none;
+    transition: transform 0.1s ease;
+}
+.btn-panel-primary:active {
+    transform: scale(0.98);
+}
+
+/* Botão Secundário: Meus Produtos */
+.btn-panel-secondary {
+    background-color: var(--branco-puro) !important;
+    color: var(--verde-safari) !important;
+    border: 1px solid var(--borda-suave) !important;
+    transition: transform 0.1s ease;
+}
+.btn-panel-secondary:active {
+    transform: scale(0.98);
+}
+
+/* Novo Container Fixo Inferior (Substituindo a Navbar) */
+.fixed-bottom-action {
+    bottom: 16px;
+}
+
+.camera-panel-container {
+    background-color: rgba(26, 33, 25, 0.96);
+    backdrop-filter: blur(10px);
+    max-width: 400px;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Botão de Câmera Premium */
+.btn-camera {
+    background-color: var(--branco-puro) !important;
+    color: var(--verde-brotar) !important;
+    width: 70px;
+    height: 70px;
+    border: none !important;
+    transition: all 0.2s ease-in-out;
+}
+.btn-camera:active {
+    transform: scale(0.92);
+    background-color: var(--fundo-creme) !important;
+}
+
+.text-max-width {
+    max-width: 290px;
+    line-height: 1.3;
+}
+
+@media (min-width: 768px) {
+    .header-status {
+        font-size: 11px;
+    }
+    .inner-header-panel h2 {
+        font-size: 24px !important;
+    }
+}
+
+/* ==========================================================================
+   ELEMENTOS EXCLUSIVOS DA PÁGINA DO PRODUTO
+   ========================================================================== */
+.border-soft {
+    border-color: var(--borda-suave) !important;
+}
+
+.max-width-150 {
+    max-width: 150px;
+}
+
+.font-11 {
+    font-size: 11px;
+}
+
+/* Customização dos Indicadores (Pontinhos) do Carrossel */
+.carousel-indicators [data-bs-target] {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--subtexto);
+    border: none;
+    margin: 0 4px;
+}
+
+.carousel-indicators .active {
+    background-color: var(--verde-safari);
+    width: 18px; /* Efeito esticado moderno para o ativo */
+    border-radius: 4px;
+}
+
+/* Wrapper do Ícone de Combinar Entrega */
+.delivery-icon-wrapper {
+    background-color: var(--fundo-creme);
+    color: var(--verde-safari);
+}
+
+.card-delivery-option {
+    border-left: 4px solid var(--verde-brotar) !important; /* Destaque sutil lateral na opção extra */
+}
+
+/* Botão de Conversão Principal */
+.btn-add-cart {
+    background-color: var(--verde-safari) !important;
+    color: var(--branco-puro) !important;
+    border: none;
+    font-size: 16px;
+    transition: transform 0.1s ease;
+}
+
+.btn-add-cart:active {
+    transform: scale(0.98);
+}
+
+/* Ajustes de Responsividade para Desktop */
+@media (min-width: 768px) {
+    .rounded-md-4 {
+        border-radius: 1rem !important;
+    }
+    .border-md-0 {
+        border: 0 !important;
+    }
+    .action-bar-container {
+        position: static;
+        padding: 0;
+    }
+}
