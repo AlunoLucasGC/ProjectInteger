@@ -1,6 +1,7 @@
-from flask import Flask, request
+from flask import Flask, request, render_template
 from werkzeug.utils import secure_filename
 import easyocr
+import os
 
 app = Flask(__name__)
 
@@ -157,7 +158,7 @@ def criar_pagina(resultado="Nenhuma imagem foi analisada."):
 
 @app.route("/")
 def pagina_inicial():
-    return criar_pagina()
+    return render_template("index.html")
 
 
 @app.route("/ler", methods=["POST"])
@@ -180,8 +181,6 @@ def executar_ocr():
     textos_encontrados = leitor.readtext(caminho, detail=0, paragraph=True)
 
     texto_completo = "\n".join(textos_encontrados)
-    
-    
 
     if not texto_completo:
         texto_completo = "Nenhum texto foi reconhecido na imagem."
