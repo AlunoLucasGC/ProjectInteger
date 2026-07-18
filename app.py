@@ -1,7 +1,6 @@
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 import easyocr
-import os
 
 app = Flask(__name__)
 
