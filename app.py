@@ -20,13 +20,16 @@ leitor = easyocr.Reader(["pt"], gpu=False)
 
 def corrigir_ocr(texto):
 
-    texto = texto.replace("k9", "kg")
-    texto = texto.replace("K9", "kg")
+    texto = texto.upper()
 
-    texto = texto.replace("O", "0")
-    texto = texto.replace("o", "0")
+    texto = texto.replace("T0MATE", "TOMATE")
+
+    texto = texto.replace("RSK", "R$")
+    texto = texto.replace("RS", "R$")
 
     texto = texto.replace(",", ".")
+
+    texto = texto.replace("O", "0")
 
     return texto
 
@@ -38,47 +41,38 @@ def corrigir_ocr(texto):
 
 def organizar_produto(texto):
 
-    palavras = texto.split()
+    resultado = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
 
-    produto = []
-    quantidade = ""
-    unidade = ""
-    preco = ""
+    # Produto
+    produto = re.search(r"[A-Za-zÀ-ÿ]+", texto)
 
-    unidades = ["kg", "g", "un", "cx", "litro", "l", "ml"]
+    if produto:
+        resultado["produto"] = produto.group().capitalize()
 
-    for palavra in palavras:
+    # Quantidade
+    quantidade = re.search(r"(\d+)\s*(kg|g|ml|l|un|cx)", texto, re.IGNORECASE)
 
-        palavra_limpa = palavra.lower()
+    if quantidade:
+        resultado["quantidade"] = quantidade.group(1)
+        resultado["unidade"] = quantidade.group(2)
 
-        # Unidade
-        if palavra_limpa in unidades:
-            unidade = palavra
+    # Preço
+    preco = re.search(r"R\$?\s*(\d+[.,]?\d*)", texto)
 
-        # Número inteiro (quantidade)
-        elif re.fullmatch(r"\d+", palavra):
-            if quantidade == "":
-                quantidade = palavra
+    if preco:
+        resultado["preco"] = preco.group(1).replace(",", ".")
 
-        # Número decimal (preço)
-        elif re.fullmatch(r"\d+\.\d+", palavra):
-            preco = palavra
-
-        # Produto
-        else:
-            produto.append(palavra)
-
-    return {
-        "produto": " ".join(produto),
-        "quantidade": quantidade,
-        "unidade": unidade,
-        "preco": preco,
-    }
+    return resultado
 
 
 @app.route("/")
 def pagina_inicial():
     return render_template("index.html")
+
+
+@app.route("/cadastro")
+def cadastro():
+    return render_template("cadastro.html")
 
 
 @app.route("/ler", methods=["POST"])

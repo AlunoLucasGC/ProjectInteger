@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Cadastro de Produto</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+
+</head>
+
+<body>
+
+<h1>🥕 Cadastro de Produto</h1>
+
+<form
+    action="/ler"
+    method="POST"
+    enctype="multipart/form-data">
+
+    <label>Escolha a imagem da ficha</label>
+
+    <input
+        type="file"
+        name="imagem"
+        accept="image/*"
+        required>
+
+    <button type="submit">
+
+        Executar OCR
+
+    </button>
+
+</form>
+
+</body>
+
+</html>
