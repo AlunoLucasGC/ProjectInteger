@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feira Fácil — Conectando Histórias e Sabores</title>
+    <!-- Vinculação correta do CSS para a estrutura de pastas do Flask -->
+    <link rel="stylesheet" href="../static/estilo.css">
+</head>
+<body>
+
+    <!-- Topo Minimalista -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="profile-area">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" alt="Sua foto de perfil" class="profile-pic">
+                <div class="profile-text">
+                    <span class="greeting">Boa tarde,</span>
+                    <strong class="user-name">Isaias Martins</strong>
+                </div>
+            </div>
+            
+            <form class="search-bar" action="#" method="GET">
+                <input type="text" placeholder="Buscar por produtos ou pequenos produtores...">
+                <button type="submit" aria-label="Buscar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="feed-container">
+        
+        <!-- Banner Conceitual (Aconchego e Sofisticação) -->
+        <section class="hero-banner">
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+                <span class="hero-tag">Curadoria Local</span>
+                <h2>Da terra direto para a sua mesa</h2>
+                <p>Apoiando o pequeno negócio rural com a simplicidade que a nossa gente merece.</p>
+            </div>
+        </section>
+
+        <!-- Filtros Rápidos / Categorias Fluidas -->
+        <section class="categorias-section">
+            <h3 class="section-title">Categorias selecionadas</h3>
+            <div class="categorias-scroll">
+                <button class="cat-pill active">Ver tudo</button>
+                <button class="cat-pill">🥦 Verduras</button>
+                <button class="cat-pill">🍎 Frutas</button>
+                <button class="cat-pill">🥔 Raízes</button>
+                <button class="cat-pill">🍯 Doces e Conservas</button>
+            </div>
+        </section>
+
+        <!-- Feed de Produtos (Estilo Galeria de Estúdio) -->
+        <section class="produtos-section">
+            <div class="section-header">
+                <h3 class="section-title">Destaques da colheita</h3>
+                <a href="#" class="see-all">Ver todos</a>
+            </div>
+            
+            <div class="produtos-grid">
+                <!-- Card 1 -->
+                <article class="produto-card">
+                    <div class="card-image-wrapper">
+                        <span class="badge-produtor">Sítio Raízes</span>
+                        <img src="https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?w=500" alt="Tomate Italiano Orgânico" class="produto-img">
+                    </div>
+                    <div class="produto-info">
+                        <h4 class="produto-nome">Tomate Italiano Orgânico</h4>
+                        <span class="produto-unidade">Porção de 1kg</span>
+                        <div class="card-footer">
+                            <span class="produto-preco">R$ 8,50</span>
+                            <button class="btn-add-minimal" aria-label="Adicionar ao carrinho">+</button>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 2 -->
+                <article class="produto-card">
+                    <div class="card-image-wrapper">
+                        <span class="badge-produtor">Dona Maria</span>
+                        <img src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=500" alt="Banana Prata" class="produto-img">
+                    </div>
+                    <div class="produto-info">
+                        <h4 class="produto-nome">Banana Prata Orgânica</h4>
+                        <span class="produto-unidade">Dúzia selecionada</span>
+                        <div class="card-footer">
+                            <span class="produto-preco">R$ 6,00</span>
+                            <button class="btn-add-minimal" aria-label="Adicionar ao carrinho">+</button>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 3 -->
+                <article class="produto-card">
+                    <div class="card-image-wrapper">
+                        <span class="badge-produtor">Sítio Alvorada</span>
+                        <img src="https://images.unsplash.com/photo-1557844352-761f2565b57e?w=500" alt="Alface Crespa" class="produto-img">
+                    </div>
+                    <div class="produto-info">
+                        <h4 class="produto-nome">Alface Crespa Hidropônica</h4>
+                        <span class="produto-unidade">Unidade maço</span>
+                        <div class="card-footer">
+                            <span class="produto-preco">R$ 3,50</span>
+                            <button class="btn-add-minimal" aria-label="Adicionar ao carrinho">+</button>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 4 -->
+                <article class="produto-card">
+                    <div class="card-image-wrapper">
+                        <span class="badge-produtor">Mel Puro Local</span>
+                        <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=500" alt="Mel de Abelha" class="produto-img">
+                    </div>
+                    <div class="produto-info">
+                        <h4 class="produto-nome">Mel de Abelha Silvestre</h4>
+                        <span class="produto-unidade">Pote de vidro 500g</span>
+                        <div class="card-footer">
+                            <span class="produto-preco">R$ 25,00</span>
+                            <button class="btn-add-minimal" aria-label="Adicionar ao carrinho">+</button>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <!-- Menu de Navegação Inferior (Design Premium Flutuante) -->
+    <nav class="bottom-nav">
+        <div class="nav-menu-container">
+            <a href="#" class="nav-item active" aria-label="Início">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span class="nav-text">Início</span>
+            </a>
+            <a href="#" class="nav-item" aria-label="Buscar">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span class="nav-text">Buscar</span>
+            </a>
+            <a href="#" class="nav-item" aria-label="Carrinho">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                <span class="nav-text">Carrinho</span>
+            </a>
+            <a href="#" class="nav-item" aria-label="Perfil">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span class="nav-text">Perfil</span>
+            </a>
+        </div>
+    </nav>
+
+</body>
+</html>

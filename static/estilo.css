@@ -1,0 +1,434 @@
+/* ==========================================================================
+   VARIÁVEIS DE DESIGN — SOFISTICADO E ORGÂNICO (REF. GROW NATURALS)
+   ========================================================================== */
+:root {
+    --verde-safari: #344634;       /* Tom escuro e elegante da referência */
+    --verde-brotar: #65A04F;       /* Verde de destaque orgânico */
+    --fundo-creme: #F8F9F6;        /* Fundo claro, mas quente e sofisticado */
+    --branco-puro: #FFFFFF;
+    --grafite: #1A2119;            /* Texto com excelente contraste, sem ser preto puro */
+    --subtexto: #606C5E;
+    --borda-suave: #EAEFE9;
+    --sombra-premium: rgba(26, 33, 25, 0.04);
+    --sombra-card: rgba(52, 70, 52, 0.05);
+}
+
+/* ==========================================================================
+   RESET E CONFIGURAÇÕES FLUIDAS
+   ========================================================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    background-color: var(--fundo-creme);
+    color: var(--grafite);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding-bottom: 110px; /* Garante que o menu flutuante inferior não cubra o conteúdo */
+}
+
+/* ==========================================================================
+   HEADER MINIMALISTA (ESTILO BOUTIQUE DIGITAL)
+   ========================================================================== */
+.main-header {
+    background-color: var(--branco-puro);
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid var(--borda-suave);
+}
+
+.header-container {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+}
+
+.profile-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-pic {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-text .greeting {
+    font-size: 11px;
+    color: var(--subtexto);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.profile-text .user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--verde-safari);
+}
+
+/* Barra de pesquisa integrada */
+.search-bar {
+    display: flex;
+    background-color: var(--fundo-creme);
+    border-radius: 10px;
+    padding: 2px;
+}
+
+.search-bar input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--grafite);
+    outline: none;
+    width: 100%; /* Evita estouro de container no mobile */
+}
+
+.search-bar button {
+    background: transparent;
+    border: none;
+    padding: 0 12px;
+    color: var(--subtexto);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+/* ==========================================================================
+   LAYOUT DO FEED (CORRIGIDO PARA MOBILE-FIRST REAL)
+   ========================================================================== */
+.feed-container {
+    padding: 16px;
+    display: grid;
+    gap: 24px;
+    width: 100%;
+    overflow-x: hidden; /* Elimina qualquer rolagem lateral indesejada */
+}
+
+/* Hero Banner Editorial (Utilizando URL absoluta para garantir compatibilidade no Flask) */
+.hero-banner {
+    position: relative;
+    background-image: url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=1000');
+    background-size: cover;
+    background-position: center;
+    border-radius: 16px;
+    padding: 24px 20px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 15px var(--sombra-card);
+}
+
+.hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to right, rgba(26,33,25,0.92), rgba(26,33,25,0.6));
+    z-index: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    width: 100%; 
+}
+
+.hero-tag {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background-color: var(--verde-brotar);
+    color: var(--branco-puro);
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.hero-content h2 {
+    color: var(--branco-puro);
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 10px;
+    line-height: 1.3;
+    word-wrap: break-word; 
+}
+
+.hero-content p {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+/* Seção de Filtros Horizontais Fluidos */
+.categorias-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+    scrollbar-width: none; 
+    -webkit-overflow-scrolling: touch; /* Rolagem elástica nativa no iOS */
+}
+
+.categorias-scroll::-webkit-scrollbar {
+    display: none; /* Oculta a barra no Chrome/Safari */
+}
+
+.cat-pill {
+    background-color: var(--branco-puro);
+    border: 1px solid var(--borda-suave);
+    padding: 8px 14px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--subtexto);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cat-pill.active {
+    background-color: var(--verde-safari);
+    color: var(--branco-puro);
+    border-color: var(--verde-safari);
+}
+
+/* Títulos das Seções */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--verde-safari);
+    letter-spacing: -0.3px;
+}
+
+.see-all {
+    font-size: 12px;
+    color: var(--verde-brotar);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   CARDS DE PRODUTOS — DOIS POR LINHA NO MOBILE
+   ========================================================================== */
+.produtos-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Mantém duas colunas simétricas perfeitas */
+    gap: 12px; 
+}
+
+.produto-card {
+    background-color: var(--branco-puro);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px var(--sombra-card);
+}
+
+.card-image-wrapper {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* Proporção quadrada 1:1 limpa */
+    background-color: var(--fundo-creme);
+}
+
+.produto-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.badge-produtor {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background-color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    color: var(--verde-safari);
+    padding: 3px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 20px;
+    z-index: 2;
+    max-width: 85%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.produto-info {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.produto-nome {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--grafite);
+    line-height: 1.3;
+    margin-bottom: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 34px; /* Fixa a altura do texto para alinhar os botões inferiores */
+}
+
+.produto-unidade {
+    font-size: 11px;
+    color: var(--subtexto);
+    margin-bottom: 8px;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+}
+
+.produto-preco {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--verde-safari);
+}
+
+.btn-add-minimal {
+    background-color: var(--fundo-creme);
+    color: var(--verde-safari);
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ==========================================================================
+   NAVEGAÇÃO INFERIOR — PREMIUM E FLUTUANTE
+   ========================================================================== */
+.bottom-nav {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 1000;
+}
+
+.nav-menu-container {
+    background-color: rgba(26, 33, 25, 0.96); 
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    height: 58px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    box-shadow: 0 8px 25px rgba(26, 33, 25, 0.2);
+    padding: 0 8px;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.5);
+    gap: 2px;
+}
+
+.nav-text {
+    font-size: 9px;
+    font-weight: 500;
+}
+
+.nav-item.active {
+    color: var(--branco-puro);
+}
+
+/* ==========================================================================
+   MEDIA QUERIES (RESPONSIVIDADE COMPORTADA PARA DESKTOP)
+   ========================================================================== */
+@media (min-width: 768px) {
+    .main-header {
+        padding: 16px 24px;
+    }
+
+    .header-container {
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .search-bar {
+        max-width: 450px;
+        justify-self: end;
+        width: 100%;
+    }
+
+    .feed-container {
+        padding: 24px;
+        max-width: 1100px;
+        margin: 0 auto;
+        gap: 32px;
+    }
+
+    .hero-banner {
+        padding: 45px 40px;
+    }
+
+    .hero-content {
+        max-width: 450px;
+    }
+
+    .hero-content h2 {
+        font-size: 28px;
+    }
+
+    .section-title {
+        font-size: 20px;
+    }
+
+    /* Grid se expande fluidamente para 4 colunas em telas maiores */
+    .produtos-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+
+    .nav-menu-container {
+        max-width: 450px;
+        margin: 0 auto;
+    }
+}
