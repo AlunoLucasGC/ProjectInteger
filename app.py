@@ -9,10 +9,7 @@ PASTA_UPLOADS = "uploads"
 
 os.makedirs(PASTA_UPLOADS, exist_ok=True)
 
-leitor = easyocr.Reader(
-    ["pt"],
-    gpu=False
-)
+leitor = easyocr.Reader(["pt"], gpu=False)
 
 
 def criar_pagina(resultado="Nenhuma imagem foi analisada."):
@@ -168,42 +165,27 @@ def pagina_inicial():
 def executar_ocr():
 
     if "imagem" not in request.files:
-        return criar_pagina(
-            "Nenhuma imagem foi enviada."
-        )
+        return criar_pagina("Nenhuma imagem foi enviada.")
 
     imagem = request.files["imagem"]
 
     if imagem.filename == "":
-        return criar_pagina(
-            "Nenhuma imagem foi selecionada."
-        )
+        return criar_pagina("Nenhuma imagem foi selecionada.")
 
-    nome_seguro = secure_filename(
-        imagem.filename
-    )
+    nome_seguro = secure_filename(imagem.filename)
 
-    caminho = os.path.join(
-        PASTA_UPLOADS,
-        nome_seguro
-    )
+    caminho = os.path.join(PASTA_UPLOADS, nome_seguro)
 
     imagem.save(caminho)
 
-    textos_encontrados = leitor.readtext(
-        caminho,
-        detail=0,
-        paragraph=True
-    )
+    textos_encontrados = leitor.readtext(caminho, detail=0, paragraph=True)
 
-    texto_completo = "\n".join(
-        textos_encontrados
-    )
+    texto_completo = "\n".join(textos_encontrados)
+    
+    
 
     if not texto_completo:
-        texto_completo = (
-            "Nenhum texto foi reconhecido na imagem."
-        )
+        texto_completo = "Nenhum texto foi reconhecido na imagem."
 
     print("\n" + "=" * 45)
     print("🥕 TEXTO RECONHECIDO PELO OCR")
@@ -211,14 +193,8 @@ def executar_ocr():
     print(texto_completo)
     print("=" * 45)
 
-    return criar_pagina(
-        texto_completo
-    )
+    return criar_pagina(texto_completo)
 
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=True
-    )
+    app.run(host="0.0.0.0", port=5000, debug=True)
