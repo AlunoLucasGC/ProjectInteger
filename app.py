@@ -2,6 +2,7 @@ from flask import Flask, request, render_template
 from werkzeug.utils import secure_filename
 import easyocr
 import os
+import re
 
 app = Flask(__name__)
 
@@ -12,148 +13,67 @@ os.makedirs(PASTA_UPLOADS, exist_ok=True)
 leitor = easyocr.Reader(["pt"], gpu=False)
 
 
-def criar_pagina(resultado="Nenhuma imagem foi analisada."):
-    return f"""
-    <!DOCTYPE html>
+# ============================================
+# Corrige alguns erros comuns do OCR
+# ============================================
 
-    <html lang="pt-BR">
 
-    <head>
-        <meta charset="UTF-8">
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1.0"
-        >
+def corrigir_ocr(texto):
 
-        <title>Feira Fácil</title>
+    texto = texto.replace("k9", "kg")
+    texto = texto.replace("K9", "kg")
 
-        <style>
-            body{{
-                margin: 0;
-                padding: 30px;
-                font-family: Arial, sans-serif;
-                background-color: #f2f6f0;
-                color: #263323;
-}}
+    texto = texto.replace("O", "0")
+    texto = texto.replace("o", "0")
 
-            .painel{{
-                max-width: 650px;
-                margin: auto;
-                padding: 30px;
-                background-color: white;
-                border-radius: 16px;
-                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}}
+    texto = texto.replace(",", ".")
 
-            h1{{
-                margin-top: 0;
-                color: #3d6b35;
-}}
+    return texto
 
-            .descricao{{
-                line-height: 1.6;
-}}
 
-            form{{
-                margin-top: 25px;
-                padding: 20px;
-                background-color: #f7faf5;
-                border: 2px dashed #8caf83;
-                border-radius: 12px;
-}}
+# ============================================
+# Organiza o texto reconhecido
+# ============================================
 
-            input{{
-                display: block;
-                margin: 15px 0;
-}}
 
-            button{{
-                padding: 12px 20px;
-                border: none;
-                border-radius: 8px;
-                background-color: #3d6b35;
-                color: white;
-                font-size: 16px;
-                cursor: pointer;
-}}
+def organizar_produto(texto):
 
-            .resultado{{
-                margin-top: 25px;
-                padding: 20px;
-                min-height: 80px;
-                background-color: #fffbea;
-                border-left: 5px solid #e1b83b;
-                border-radius: 8px;
-                white-space: pre-wrap;
-                line-height: 1.7;
-}}
+    palavras = texto.split()
 
-            .dica{{
-                margin-top: 20px;
-                color: #52634e;
-                font-size: 14px;
-                line-height: 1.5;
-}}
-        </style>
-    </head>
+    produto = []
+    quantidade = ""
+    unidade = ""
+    preco = ""
 
-    <body>
+    unidades = ["kg", "g", "un", "cx", "litro", "l", "ml"]
 
-        <main class="painel">
+    for palavra in palavras:
 
-            <h1>🥕 Feira Fácil</h1>
+        palavra_limpa = palavra.lower()
 
-            <p class="descricao">
-                Envie uma imagem contendo o nome de um produto,
-                sua quantidade, unidade e preço.
-            </p>
+        # Unidade
+        if palavra_limpa in unidades:
+            unidade = palavra
 
-            <form
-                action="/ler"
-                method="POST"
-                enctype="multipart/form-data"
-            >
+        # Número inteiro (quantidade)
+        elif re.fullmatch(r"\d+", palavra):
+            if quantidade == "":
+                quantidade = palavra
 
-                <label for="imagem">
-                    <strong>📷 Escolha ou fotografe uma imagem:</strong>
-                </label>
+        # Número decimal (preço)
+        elif re.fullmatch(r"\d+\.\d+", palavra):
+            preco = palavra
 
-                <input
-                    type="file"
-                    id="imagem"
-                    name="imagem"
-                    accept="image/*"
-                    capture="environment"
-                    required
-                >
+        # Produto
+        else:
+            produto.append(palavra)
 
-                <button type="submit">
-                    👁️ Executar OCR
-                </button>
-
-            </form>
-
-            <section class="resultado">
-
-                <strong>Texto reconhecido:</strong>
-
-                <br><br>
-
-{resultado}
-
-            </section>
-
-            <p class="dica">
-                💡 Para o primeiro teste, use uma imagem clara,
-                reta, com fundo branco e texto preto.
-            </p>
-
-        </main>
-
-    </body>
-
-    </html>
-    """
+    return {
+        "produto": " ".join(produto),
+        "quantidade": quantidade,
+        "unidade": unidade,
+        "preco": preco,
+    }
 
 
 @app.route("/")
@@ -164,13 +84,14 @@ def pagina_inicial():
 @app.route("/ler", methods=["POST"])
 def executar_ocr():
 
+    # Verifica se uma imagem foi enviada
     if "imagem" not in request.files:
-        return criar_pagina("Nenhuma imagem foi enviada.")
+        return render_template("resultado.html", erro="Nenhuma imagem foi enviada.")
 
     imagem = request.files["imagem"]
 
     if imagem.filename == "":
-        return criar_pagina("Nenhuma imagem foi selecionada.")
+        return render_template("resultado.html", erro="Nenhuma imagem foi selecionada.")
 
     nome_seguro = secure_filename(imagem.filename)
 
@@ -183,15 +104,28 @@ def executar_ocr():
     texto_completo = "\n".join(textos_encontrados)
 
     if not texto_completo:
-        texto_completo = "Nenhum texto foi reconhecido na imagem."
+
+        return render_template("resultado.html", erro="Nenhum texto foi reconhecido.")
+
+    texto_corrigido = corrigir_ocr(texto_completo)
+
+    dados = organizar_produto(texto_corrigido)
 
     print("\n" + "=" * 45)
-    print("🥕 TEXTO RECONHECIDO PELO OCR")
+    print("🥕 TEXTO ORIGINAL")
     print("=" * 45)
     print(texto_completo)
+
+    print("\n🥕 TEXTO CORRIGIDO")
+    print("=" * 45)
+    print(texto_corrigido)
+
+    print("\n🥕 DADOS ORGANIZADOS")
+    print("=" * 45)
+    print(dados)
     print("=" * 45)
 
-    return criar_pagina(texto_completo)
+    return render_template("resultado.html", dados=dados, texto=texto_completo)
 
 
 if __name__ == "__main__":
