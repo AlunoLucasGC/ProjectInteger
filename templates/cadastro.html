@@ -1,40 +1,48 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+
+<html lang="pt-br">
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <title>Cadastro de Produto</title>
+<title>Feira Fácil</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+<link rel="stylesheet"
+href="{{ url_for('static', filename='estilo.css') }}">
 
 </head>
 
 <body>
 
-<h1>🥕 Cadastro de Produto</h1>
+<div class="container">
+
+<h1>🌱 Feira Fácil</h1>
+
+<h2>Enviar Ficha</h2>
 
 <form
-    action="/ler"
-    method="POST"
-    enctype="multipart/form-data">
+action="/ler"
+method="POST"
+enctype="multipart/form-data">
 
-    <label>Escolha a imagem da ficha</label>
+<label>Escolha uma foto da ficha</label>
 
-    <input
-        type="file"
-        name="imagem"
-        accept="image/*"
-        required>
+<input
+type="file"
+name="imagem"
+accept="image/*"
+required>
 
-    <button type="submit">
+<button type="submit">
 
-        Executar OCR
+📷 Executar OCR
 
-    </button>
+</button>
 
 </form>
+
+</div>
 
 </body>
 

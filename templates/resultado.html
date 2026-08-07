@@ -1,33 +1,87 @@
-<form>
+<!DOCTYPE html>
+<html lang="pt-br">
 
-    <label>Produto</label>
+<head>
 
-    <input
-        type="text"
-        value="{{ dados.produto }}">
+    <meta charset="UTF-8">
 
-    <label>Quantidade</label>
+    <title>Feira Fácil</title>
 
-    <input
-        type="text"
-        value="{{ dados.quantidade }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='estilo.css') }}">
 
-    <label>Unidade</label>
+</head>
 
-    <input
-        type="text"
-        value="{{ dados.unidade }}">
+<body>
 
-    <label>Preço</label>
+<div class="container">
 
-    <input
-        type="text"
-        value="{{ dados.preco }}">
+    <!-- Título da página -->
+    <h1>🌱 Feira Fácil</h1>
 
-    <button>
+    <h2>Revisão do Produto</h2>
 
-        Confirmar
+    <!-- Formulário -->
+    <form>
 
-    </button>
+        <!-- Produto -->
+        <div class="campo">
 
-</form>
+            <label>Produto</label>
+
+            <input
+                type="text"
+                value="{{ dados.produto }}">
+
+        </div>
+
+        <!-- Linha com quantidade e unidade -->
+        <div class="linha">
+
+            <div class="campo">
+
+                <label>Quantidade</label>
+
+                <input
+                    type="text"
+                    value="{{ dados.quantidade }}">
+
+            </div>
+
+            <div class="campo">
+
+                <label>Unidade</label>
+
+                <input
+                    type="text"
+                    value="{{ dados.unidade }}">
+
+            </div>
+
+        </div>
+
+        <!-- Preço -->
+        <div class="campo">
+
+            <label>Preço</label>
+
+            <input
+                type="text"
+                value="{{ dados.preco }}">
+
+        </div>
+
+        <!-- Botão -->
+        <button>
+
+            ✔ Confirmar Produto
+
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+
+</html>
