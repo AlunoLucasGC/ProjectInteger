@@ -4,6 +4,12 @@ import easyocr
 import os
 import re
 
+# Biblioteca responsável por manipular imagens
+import cv2
+
+# Biblioteca NumPy utilizada pelo OpenCV
+import numpy as np
+
 app = Flask(__name__)
 
 PASTA_UPLOADS = "uploads"
@@ -11,6 +17,43 @@ PASTA_UPLOADS = "uploads"
 os.makedirs(PASTA_UPLOADS, exist_ok=True)
 
 leitor = easyocr.Reader(["pt"], gpu=False)
+
+# ==================================
+# MELHORA A IMAGEM ANTES DO OCR
+# ==================================
+
+
+def melhorar_imagem(caminho):
+
+    # Lê a imagem do disco
+    imagem = cv2.imread(caminho)
+
+    # Verifica se a imagem foi carregada corretamente
+    if imagem is None:
+        raise Exception("Erro ao carregar a imagem.")
+
+    # Converte para escala de cinza
+    cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+
+    # Aumenta um pouco o tamanho da imagem
+    # Isso ajuda muito quando a letra está pequena
+    cinza = cv2.resize(cinza, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+    # Remove pequenos ruídos
+    cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
+
+    # Aumenta bastante o constraste
+    _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Separa o nome do arquivo da extensão
+    nome_arquivo, extensao = os.path.splitext(caminho)
+
+    # Cria um novo nome para a imagem tratada
+    caminho_novo = nome_arquivo + "_tratada" + extensao
+
+    cv2.imwrite(caminho_novo, binaria)
+
+    return caminho_novo
 
 
 # ============================================
@@ -29,8 +72,6 @@ def corrigir_ocr(texto):
 
     texto = texto.replace(",", ".")
 
-    texto = texto.replace("O", "0")
-
     return texto
 
 
@@ -39,28 +80,51 @@ def corrigir_ocr(texto):
 # ============================================
 
 
+# ============================================
+# Organiza os dados encontrados pelo OCR
+# ============================================
+
+
 def organizar_produto(texto):
 
+    # Dicionário onde serão armazenados os dados
     resultado = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
 
-    # Produto
-    produto = re.search(r"[A-Za-zÀ-ÿ]+", texto)
+    # ----------------------------------------
+    # Procura o nome do produto
+    # Exemplo:
+    # PRODUTO: TOMATE
+    # ----------------------------------------
+    produto = re.search(r"PRODUTO:\s*(.+)", texto, re.IGNORECASE)
 
     if produto:
-        resultado["produto"] = produto.group().capitalize()
+        resultado["produto"] = produto.group(1).strip().title()
 
-    # Quantidade
-    quantidade = re.search(r"(\d+)\s*(kg|g|ml|l|un|cx)", texto, re.IGNORECASE)
+    # ----------------------------------------
+    # Procura quantidade e unidade
+    # Exemplo:
+    # QUANTIDADE: 2 KG
+    # ----------------------------------------
+    quantidade = re.search(
+        r"QUANTIDADE:\s*(\d+)\s*(KG|G|ML|L|UN|CX)", texto, re.IGNORECASE
+    )
 
     if quantidade:
         resultado["quantidade"] = quantidade.group(1)
-        resultado["unidade"] = quantidade.group(2)
+        resultado["unidade"] = quantidade.group(2).upper()
 
-    # Preço
-    preco = re.search(r"R\$?\s*(\d+[.,]?\d*)", texto)
+    # ----------------------------------------
+    # Procura o preço
+    # Aceita PREÇO ou PRECO
+    # ----------------------------------------
+    preco = re.search(
+    r"PRE(?:Ç|C)O:\s*R\$?\s*([\d\.]+)",
+    texto,
+    re.IGNORECASE
+)
 
     if preco:
-        resultado["preco"] = preco.group(1).replace(",", ".")
+        resultado["preco"] = preco.group(1)
 
     return resultado
 
@@ -93,13 +157,23 @@ def executar_ocr():
 
     imagem.save(caminho)
 
-    textos_encontrados = leitor.readtext(caminho, detail=0, paragraph=True)
+    imagem_tratada = melhorar_imagem(caminho)
+
+    print("Imagem original :", caminho)
+    print("Imagem tratada  :", imagem_tratada)
+
+    # Faz o OCR na imagem tratada
+    textos_encontrados = leitor.readtext(imagem_tratada, detail=0, paragraph=True)
 
     texto_completo = "\n".join(textos_encontrados)
 
     if not texto_completo:
 
-        return render_template("resultado.html", erro="Nenhum texto foi reconhecido.")
+        return render_template(
+            "resultado.html",
+            erro="Nenhum texto foi reconhecido.",
+            dados={"produto": "", "quantidade": "", "unidade": "", "preco": ""},
+        )
 
     texto_corrigido = corrigir_ocr(texto_completo)
 
