@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 BASE_DIR: Final = Path(__file__).resolve().parent
 UPLOAD_FOLDER: Final = BASE_DIR / "uploads"
 DATABASE: Final = BASE_DIR / "feira_facil.db"
+SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
@@ -30,26 +31,62 @@ def get_connection() -> sqlite3.Connection:
     """Abre uma conexão configurada para devolver linhas nomeadas."""
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
 def init_database() -> None:
-    """Cria a única tabela do MVP caso ela ainda não exista."""
+    """Inicializa o arquivo SQLite e importa anúncios do esquema antigo uma vez."""
     with get_connection() as connection:
+        connection.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
+        connection.execute("INSERT OR IGNORE INTO tb_categorias (nome) VALUES (?)", ("Sem categoria",))
+        legacy_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'produtos'"
+        ).fetchone()
+        connection.execute("CREATE TABLE IF NOT EXISTS migracoes (nome TEXT PRIMARY KEY)")
+        migration_done = connection.execute(
+            "SELECT 1 FROM migracoes WHERE nome = ?", ("produtos_para_tb_produtos",)
+        ).fetchone()
+        if legacy_table and migration_done is None:
+            _migrate_legacy_products(connection)
+        connection.execute("INSERT OR IGNORE INTO migracoes (nome) VALUES (?)", ("produtos_para_tb_produtos",))
+
+
+def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
+    """Converte a tabela local ``produtos`` do MVP para o esquema normalizado."""
+    category_id = connection.execute(
+        "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
+    ).fetchone()["id_categoria"]
+    legacy_products = connection.execute("SELECT * FROM produtos ORDER BY id").fetchall()
+    for product in legacy_products:
+        producer = connection.execute(
+            "SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?",
+            (product["produtor"], product["contato"]),
+        ).fetchone()
+        if producer is None:
+            cursor = connection.execute(
+                "INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)",
+                (product["produtor"], product["contato"]),
+            )
+            producer_id = cursor.lastrowid
+        else:
+            producer_id = producer["id_produtor"]
         connection.execute(
             """
-            CREATE TABLE IF NOT EXISTS produtos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                quantidade TEXT NOT NULL,
-                unidade TEXT NOT NULL,
-                preco TEXT NOT NULL,
-                produtor TEXT NOT NULL,
-                contato TEXT NOT NULL,
-                imagem TEXT,
-                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """
+            INSERT INTO tb_produtos
+                (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, data_cadastro)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                producer_id,
+                category_id,
+                product["nome"],
+                product["quantidade"],
+                product["unidade"],
+                product["preco"],
+                product["imagem"],
+                product["criado_em"],
+            ),
         )
 
 
@@ -158,7 +195,15 @@ def pagina_inicial():
     busca = request.args.get("q", "").strip()
     with get_connection() as connection:
         produtos = connection.execute(
-            "SELECT * FROM produtos WHERE nome LIKE ? OR produtor LIKE ? ORDER BY id DESC",
+            """
+            SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
+                   printf('%.2f', p.preco) AS preco, pr.nome AS produtor,
+                   pr.telefone AS contato, p.foto_produto AS imagem
+            FROM tb_produtos AS p
+            JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor
+            WHERE p.disponivel = 1 AND (p.nome LIKE ? OR pr.nome LIKE ?)
+            ORDER BY p.id_produto DESC
+            """,
             (f"%{busca}%", f"%{busca}%"),
         ).fetchall()
     return render_template("index.html", produtos=produtos, busca=busca)
@@ -201,9 +246,36 @@ def publicar_produto():
         return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem=request.form.get("imagem", "")), 400
 
     with get_connection() as connection:
+        category_id = connection.execute(
+            "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
+        ).fetchone()["id_categoria"]
+        producer = connection.execute(
+            "SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?",
+            (dados["produtor"], dados["contato"]),
+        ).fetchone()
+        if producer is None:
+            producer_id = connection.execute(
+                "INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)",
+                (dados["produtor"], dados["contato"]),
+            ).lastrowid
+        else:
+            producer_id = producer["id_produtor"]
         connection.execute(
-            "INSERT INTO produtos (nome, quantidade, unidade, preco, produtor, contato, imagem) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (dados["produto"], dados["quantidade"], dados["unidade"], dados["preco"], dados["produtor"], dados["contato"], request.form.get("imagem") or None),
+            """
+            INSERT INTO tb_produtos
+                (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, foto_ficha)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                producer_id,
+                category_id,
+                dados["produto"],
+                dados["quantidade"],
+                dados["unidade"],
+                dados["preco"],
+                request.form.get("imagem") or None,
+                request.form.get("imagem") or None,
+            ),
         )
     flash("Produto publicado e disponível para consumidores!", "success")
     return redirect(url_for("pagina_inicial"))
