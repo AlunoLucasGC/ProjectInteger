@@ -1,87 +1,40 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-
+<!doctype html>
+<html lang="pt-BR">
 <head>
-
-    <meta charset="UTF-8">
-
-    <title>Feira Fácil</title>
-
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='estilo.css') }}">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revisar anúncio | Feira Fácil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
-
 <body>
-
-<div class="container">
-
-    <!-- Título da página -->
-    <h1>🌱 Feira Fácil</h1>
-
-    <h2>Revisão do Produto</h2>
-
-    <!-- Formulário -->
-    <form>
-
-        <!-- Produto -->
-        <div class="campo">
-
-            <label>Produto</label>
-
-            <input
-                type="text"
-                value="{{ dados.produto }}">
-
+  <main class="form-page">
+    <a class="back-link" href="{{ url_for('cadastro') }}">← Enviar outra ficha</a>
+    <section class="form-card">
+      <p class="eyebrow">ETAPA FINAL</p>
+      <h1>Revise seu anúncio</h1>
+      <p>O OCR pode errar. Ajuste os dados abaixo antes de publicar.</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
+      {% endwith %}
+      <!-- Os campos ficam editáveis para que o produtor corrija qualquer leitura do OCR. -->
+      <form action="{{ url_for('publicar_produto') }}" method="post">
+        <input type="hidden" name="imagem" value="{{ imagem }}">
+        <input type="hidden" name="texto" value="{{ texto }}">
+        <label for="produto">Produto</label>
+        <input id="produto" name="produto" value="{{ dados.produto }}" maxlength="100" required>
+        <div class="field-row">
+          <div><label for="quantidade">Quantidade</label><input id="quantidade" name="quantidade" value="{{ dados.quantidade }}" inputmode="decimal" required></div>
+          <div><label for="unidade">Unidade</label><select id="unidade" name="unidade" required>{% for unidade in ['KG', 'G', 'L', 'ML', 'UN', 'CX', 'DZ', 'MAÇO'] %}<option value="{{ unidade }}" {% if dados.unidade == unidade %}selected{% endif %}>{{ unidade }}</option>{% endfor %}</select></div>
         </div>
-
-        <!-- Linha com quantidade e unidade -->
-        <div class="linha">
-
-            <div class="campo">
-
-                <label>Quantidade</label>
-
-                <input
-                    type="text"
-                    value="{{ dados.quantidade }}">
-
-            </div>
-
-            <div class="campo">
-
-                <label>Unidade</label>
-
-                <input
-                    type="text"
-                    value="{{ dados.unidade }}">
-
-            </div>
-
-        </div>
-
-        <!-- Preço -->
-        <div class="campo">
-
-            <label>Preço</label>
-
-            <input
-                type="text"
-                value="{{ dados.preco }}">
-
-        </div>
-
-        <!-- Botão -->
-        <button>
-
-            ✔ Confirmar Produto
-
-        </button>
-
-    </form>
-
-</div>
-
+        <label for="preco">Preço (R$)</label>
+        <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
+        <label for="produtor">Nome do produtor</label>
+        <input id="produtor" name="produtor" value="{{ dados.produtor|default('') }}" maxlength="100" required>
+        <label for="contato">Telefone ou WhatsApp</label>
+        <input id="contato" name="contato" value="{{ dados.contato|default('') }}" maxlength="100" required>
+        <button type="submit">✓ Publicar produto</button>
+      </form>
+    </section>
+  </main>
 </body>
-
 </html>
