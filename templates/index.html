@@ -1,173 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feira Fácil — Conectando Histórias e Sabores</title>
-    
-    <!-- Bootstrap 5 CSS CDN (Core para Grid e Responsividade) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    
-    <!-- Seu CSS customizado para Identidade Visual e Cores -->
-    <link rel="stylesheet" href="../static/estilo.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feira Fácil | Produtos locais</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
-
-    <!-- Topo Minimalista -->
-    <header class="main-header bg-white sticky-top border-bottom py-2 px-3">
-        <div class="container-fluid max-width-container p-0 d-flex flex-column gap-2">
-            <div class="profile-area d-flex align-items-center gap-2">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" alt="Sua foto de perfil" class="profile-pic rounded-circle">
-                <div class="profile-text d-flex flex-column">
-                    <span class="greeting text-uppercase tracking-wider">Boa tarde,</span>
-                    <strong class="user-name">Isaias Martins</strong>
-                    <a href="/cadastro" class="btn-cadastrar">
-                Sou produtor
-                    </a>
-                </div>
-            </div>
-            
-            <form class="search-bar d-flex rounded-3 overflow-hidden p-1 align-items-center" action="#" method="GET">
-                <input type="text" class="form-control border-0 bg-transparent shadow-none py-2 px-3" placeholder="Buscar por produtos ou pequenos produtores...">
-                <button type="submit" class="btn border-0 px-3 py-0 d-flex align-items-center" aria-label="Buscar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                </button>
-            </form>
-        </div>
-    </header>
-
-    <!-- Conteúdo Principal -->
-    <main class="container-fluid max-width-container p-3 d-flex flex-column gap-4">
-        
-        <!-- Banner Conceitual (Aconchego e Sofisticação) -->
-        <section class="hero-banner rounded-4 overflow-hidden position-relative p-4 d-flex align-items-center shadow-sm">
-            <div class="hero-overlay position-absolute top-0 start-0 w-100 h-100"></div>
-            <div class="hero-content position-relative z-2 w-100">
-                <span class="hero-tag px-2 py-1 rounded text-uppercase fw-semibold mb-2 d-inline-block">Curadoria Local</span>
-                <h2 class="text-white fw-bold lh-sm mb-1 fs-4">Da terra direto para a sua mesa</h2>
-                <p class="text-white-50 small mb-0 lh-base">Apoiando o pequeno negócio rural com a simplicidade que a nossa gente merece.</p>
-            </div>
-        </section>
-
-        <!-- Filtros Rápidos / Categorias Fluidas -->
-        <section class="categorias-section">
-            <h3 class="section-title fw-bold mb-3">Categorias selecionadas</h3>
-            <div class="categorias-scroll d-flex gap-2 overflow-x-auto pb-1">
-                <button class="cat-pill active border rounded-pill px-3 py-2 btn shadow-none">Ver tudo</button>
-                <button class="cat-pill border rounded-pill px-3 py-2 btn shadow-none">🥦 Verduras</button>
-                <button class="cat-pill border rounded-pill px-3 py-2 btn shadow-none">🍎 Frutas</button>
-                <button class="cat-pill border rounded-pill px-3 py-2 btn shadow-none">🥔 Raízes</button>
-                <button class="cat-pill border rounded-pill px-3 py-2 btn shadow-none">🍯 Doces e Conservas</button>
-            </div>
-        </section>
-
-        <!-- Feed de Produtos (Estilo Galeria de Estúdio) -->
-        <section class="produtos-section">
-            <div class="section-header d-flex justify-content-between align-items-center mb-3">
-                <h3 class="section-title fw-bold mb-0">Destaques da colheita</h3>
-                <a href="#" class="see-all text-decoration-none fw-semibold">Ver todos</a>
-            </div>
-            
-            <!-- Grid Otimizado: 2 colunas no celular (g-2/g-3), 3 em tablets (md) e 4 em desktop (lg) -->
-            <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
-                <!-- Card 1 -->
-                <div class="col">
-                    <article class="produto-card h-100 d-flex flex-column rounded-4 overflow-hidden shadow-sm border-0 bg-white">
-                        <div class="card-image-wrapper position-relative w-100 pt-100 bg-light">
-                            <span class="badge-produtor position-absolute rounded-pill fw-bold px-2 py-1 text-truncate">Sítio Raízes</span>
-                            <img src="https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?w=500" alt="Tomate Italiano Orgânico" class="produto-img position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
-                        </div>
-                        <div class="produto-info p-3 d-flex flex-column flex-grow-1">
-                            <h4 class="produto-nome fw-semibold mb-1 text-truncate-2">Tomate Italiano Orgânico</h4>
-                            <span class="produto-unidade small mb-3">Porção de 1kg</span>
-                            <div class="card-footer bg-transparent border-0 p-0 d-flex justify-content-between align-items-center mt-auto">
-                                <span class="produto-preco fw-bold fs-5">R$ 8,50</span>
-                                <button class="btn-add-minimal border-0 rounded-circle d-flex align-items-center justify-content-center" aria-label="Adicionar ao carrinho">+</button>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- Card 2 -->
-                <div class="col">
-                    <article class="produto-card h-100 d-flex flex-column rounded-4 overflow-hidden shadow-sm border-0 bg-white">
-                        <div class="card-image-wrapper position-relative w-100 pt-100 bg-light">
-                            <span class="badge-produtor position-absolute rounded-pill fw-bold px-2 py-1 text-truncate">Dona Maria</span>
-                            <img src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=500" alt="Banana Prata" class="produto-img position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
-                        </div>
-                        <div class="produto-info p-3 d-flex flex-column flex-grow-1">
-                            <h4 class="produto-nome fw-semibold mb-1 text-truncate-2">Banana Prata Orgânica</h4>
-                            <span class="produto-unidade small mb-3">Dúzia selecionada</span>
-                            <div class="card-footer bg-transparent border-0 p-0 d-flex justify-content-between align-items-center mt-auto">
-                                <span class="produto-preco fw-bold fs-5">R$ 6,00</span>
-                                <button class="btn-add-minimal border-0 rounded-circle d-flex align-items-center justify-content-center" aria-label="Adicionar ao carrinho">+</button>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- Card 3 -->
-                <div class="col">
-                    <article class="produto-card h-100 d-flex flex-column rounded-4 overflow-hidden shadow-sm border-0 bg-white">
-                        <div class="card-image-wrapper position-relative w-100 pt-100 bg-light">
-                            <span class="badge-produtor position-absolute rounded-pill fw-bold px-2 py-1 text-truncate">Sítio Alvorada</span>
-                            <img src="https://images.unsplash.com/photo-1557844352-761f2565b57e?w=500" alt="Alface Crespa" class="produto-img position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
-                        </div>
-                        <div class="produto-info p-3 d-flex flex-column flex-grow-1">
-                            <h4 class="produto-nome fw-semibold mb-1 text-truncate-2">Alface Crespa Hidropônica</h4>
-                            <span class="produto-unidade small mb-3">Unidade maço</span>
-                            <div class="card-footer bg-transparent border-0 p-0 d-flex justify-content-between align-items-center mt-auto">
-                                <span class="produto-preco fw-bold fs-5">R$ 3,50</span>
-                                <button class="btn-add-minimal border-0 rounded-circle d-flex align-items-center justify-content-center" aria-label="Adicionar ao carrinho">+</button>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- Card 4 -->
-                <div class="col">
-                    <article class="produto-card h-100 d-flex flex-column rounded-4 overflow-hidden shadow-sm border-0 bg-white">
-                        <div class="card-image-wrapper position-relative w-100 pt-100 bg-light">
-                            <span class="badge-produtor position-absolute rounded-pill fw-bold px-2 py-1 text-truncate">Mel Puro Local</span>
-                            <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=500" alt="Mel de Abelha" class="produto-img position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
-                        </div>
-                        <div class="produto-info p-3 d-flex flex-column flex-grow-1">
-                            <h4 class="produto-nome fw-semibold mb-1 text-truncate-2">Mel de Abelha Silvestre</h4>
-                            <span class="produto-unidade small mb-3">Pote de vidro 500g</span>
-                            <div class="card-footer bg-transparent border-0 p-0 d-flex justify-content-between align-items-center mt-auto">
-                                <span class="produto-preco fw-bold fs-5">R$ 25,00</span>
-                                <button class="btn-add-minimal border-0 rounded-circle d-flex align-items-center justify-content-center" aria-label="Adicionar ao carrinho">+</button>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Menu de Navegação Inferior (Design Premium Flutuante) -->
-    <nav class="bottom-nav position-fixed start-0 end-0 px-3 z-3">
-        <div class="nav-menu-container d-grid mx-auto rounded-4 shadow-lg px-2 align-items-center">
-            <a href="#" class="nav-item active d-flex flex-column align-items-center justify-content-center text-decoration-none" aria-label="Início">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                <span class="nav-text">Início</span>
-            </a>
-            <a href="#" class="nav-item d-flex flex-column align-items-center justify-content-center text-decoration-none" aria-label="Buscar">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <span class="nav-text">Buscar</span>
-            </a>
-            <a href="#" class="nav-item d-flex flex-column align-items-center justify-content-center text-decoration-none" aria-label="Carrinho">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-                <span class="nav-text">Carrinho</span>
-            </a>
-            <a href="#" class="nav-item d-flex flex-column align-items-center justify-content-center text-decoration-none" aria-label="Perfil">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span class="nav-text">Perfil</span>
-            </a>
-        </div>
-    </nav>
-
-    <!-- Bootstrap 5 JavaScript Bundle (Opcional, se usar modais/dropdowns do Bootstrap depois) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <header class="site-header"><a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a><a class="producer-link" href="{{ url_for('cadastro') }}">Sou produtor</a></header>
+  <main class="catalog">
+    <section class="hero"><p class="eyebrow">DO CAMPO PARA A SUA MESA</p><h1>Produtos frescos, de quem produz perto de você.</h1><p>Encontre produtores locais e combine a compra diretamente com eles.</p></section>
+    <!-- A busca é feita no servidor para funcionar também sem JavaScript. -->
+    <form class="search" action="{{ url_for('pagina_inicial') }}" method="get"><label class="sr-only" for="q">Buscar produtos ou produtores</label><input id="q" name="q" value="{{ busca }}" placeholder="Buscar produtos ou produtores"><button type="submit">Buscar</button></form>
+    {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}{% endwith %}
+    <section aria-labelledby="titulo-produtos"><div class="section-heading"><h2 id="titulo-produtos">Produtos disponíveis</h2><span>{{ produtos|length }} encontrado{{ '' if produtos|length == 1 else 's' }}</span></div>
+      {% if produtos %}<div class="product-grid">{% for produto in produtos %}<article class="product-card">
+        {% if produto.imagem %}<img src="{{ url_for('upload', nome=produto.imagem) }}" alt="Foto de {{ produto.nome }}">{% else %}<div class="image-placeholder" aria-hidden="true">🌿</div>{% endif %}
+        <div class="product-body"><p class="producer">{{ produto.produtor }}</p><h3>{{ produto.nome }}</h3><p>{{ produto.quantidade }} {{ produto.unidade }}</p><strong>R$ {{ produto.preco }}</strong><a class="contact" href="tel:{{ produto.contato|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">Falar com produtor</a></div>
+      </article>{% endfor %}</div>{% else %}<div class="empty-state"><h3>Nenhum produto encontrado.</h3><p>{% if busca %}Tente outro termo de busca.{% else %}Seja o primeiro produtor a publicar uma oferta.{% endif %}</p><a class="producer-link" href="{{ url_for('cadastro') }}">Cadastrar produto</a></div>{% endif %}
+    </section>
+  </main>
 </body>
 </html>

@@ -1,49 +1,30 @@
-<!DOCTYPE html>
-
-<html lang="pt-br">
-
+<!doctype html>
+<html lang="pt-BR">
 <head>
-
-<meta charset="UTF-8">
-
-<title>Feira Fácil</title>
-
-<link rel="stylesheet"
-href="{{ url_for('static', filename='estilo.css') }}">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enviar ficha | Feira Fácil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
-
 <body>
-
-<div class="container">
-
-<h1>🌱 Feira Fácil</h1>
-
-<h2>Enviar Ficha</h2>
-
-<form
-action="/ler"
-method="POST"
-enctype="multipart/form-data">
-
-<label>Escolha uma foto da ficha</label>
-
-<input
-type="file"
-name="imagem"
-accept="image/*"
-required>
-
-<button type="submit">
-
-📷 Executar OCR
-
-</button>
-
-</form>
-
-</div>
-
+  <main class="form-page">
+    <a class="back-link" href="{{ url_for('pagina_inicial') }}">← Voltar ao catálogo</a>
+    <section class="form-card">
+      <p class="eyebrow">ÁREA DO PRODUTOR</p>
+      <h1>Cadastre com uma foto</h1>
+      <p>Fotografe sua ficha preenchida. Nós lemos os campos e você confere tudo antes de publicar.</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
+      {% endwith %}
+      <!-- enctype permite enviar o arquivo da imagem para a rota de OCR. -->
+      <form action="{{ url_for('executar_ocr') }}" method="post" enctype="multipart/form-data">
+        <label for="imagem">Foto da ficha</label>
+        <input id="imagem" type="file" name="imagem" accept="image/jpeg,image/png,image/webp" required>
+        <small>Formatos aceitos: JPG, PNG e WEBP. Tamanho máximo: 8 MB.</small>
+        <button type="submit">📷 Ler ficha com OCR</button>
+      </form>
+      <details><summary>Como preencher a ficha?</summary><p>Use uma linha para cada campo: <strong>PRODUTO: Tomate</strong>, <strong>QUANTIDADE: 2 KG</strong> e <strong>PREÇO: R$ 8,50</strong>.</p></details>
+    </section>
+  </main>
 </body>
-
 </html>

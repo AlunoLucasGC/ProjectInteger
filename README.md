@@ -1,60 +1,64 @@
 # 🌱 Feira Fácil
 
-O **Feira Fácil** é um MVP desenvolvido para conectar produtores rurais e consumidores de forma simples e acessível.
+O **Feira Fácil** é um MVP para aproximar produtores rurais e consumidores. O produtor envia uma foto de uma ficha padronizada; o sistema usa OCR para sugerir os dados do anúncio; e o produtor revisa tudo antes da publicação.
 
-A proposta do projeto é eliminar a necessidade de formulários complexos. O produtor apenas preenche uma ficha padronizada com seus produtos, tira uma foto pelo aplicativo e o sistema utiliza **OCR (Reconhecimento Óptico de Caracteres)** para extrair automaticamente as informações. Após uma tela de revisão, os produtos são publicados para consulta dos consumidores. :contentReference[oaicite:0]{index=0}
+> Este projeto não usa IA generativa. O reconhecimento é feito por OCR local com EasyOCR e pré-processamento de imagem com OpenCV.
 
-## ✨ Funcionalidades
+## Funcionalidades
 
-- 📷 Captura de imagem da ficha do produtor
-- 🔍 Leitura automática utilizando OCR
-- 📝 Extração e organização dos dados em Python
-- ✅ Tela de revisão antes da publicação
-- 🛒 Consulta de produtos pelos consumidores
-- 📞 Contato direto entre consumidor e produtor
+- Envio seguro de ficha em JPG, PNG ou WEBP (até 8 MB).
+- Pré-processamento da imagem e OCR em português.
+- Extração de produto, quantidade, unidade e preço.
+- Tela de revisão editável: o OCR nunca publica dados sem confirmação.
+- Validação dos dados e armazenamento local em SQLite.
+- Catálogo público com busca por produto ou produtor e botão de contato direto.
 
-## 🏗️ Arquitetura
+## Arquitetura
 
-O sistema é dividido em camadas:
+```text
+Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
+```
 
-- Aplicativo (captura e consulta)
-- API em Python
-- Módulo OCR
-- Banco de Dados
-- API de resposta
+- **Interface Flask:** páginas de catálogo, envio e revisão.
+- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura.
+- **Persistência:** SQLite armazena os anúncios publicados para o MVP.
+- **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
 
-Essa separação facilita manutenção, testes e futuras evoluções. :contentReference[oaicite:1]{index=1}
+## Como executar
 
-## 🛠️ Tecnologias
+1. Crie e ative um ambiente virtual.
+2. Instale as dependências:
 
-- Python
-- Flask ou FastAPI
-- EasyOCR ou Tesseract OCR
-- SQLite / MySQL / PostgreSQL
-- OpenCV
-- Pillow
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
 
-## 🚀 Fluxo do Sistema
+3. Inicie a aplicação:
 
-1. O produtor preenche uma ficha.
-2. O aplicativo fotografa a ficha.
-3. A imagem é enviada para a API.
-4. O OCR extrai o texto.
-5. O Python organiza e valida os dados.
-6. O produtor confirma as informações.
-7. Os produtos ficam disponíveis para consulta. :contentReference[oaicite:2]{index=2}
+   ```bash
+   python app.py
+   ```
 
-## 🎯 Objetivo
+4. Acesse `http://127.0.0.1:5000`.
 
-Desenvolver uma solução simples e acessível para aproximar produtores rurais dos consumidores, reduzindo o tempo de cadastro de produtos através do uso de OCR, sem utilizar Inteligência Artificial Generativa. :contentReference[oaicite:3]{index=3}
+Para produção, defina uma `SECRET_KEY` forte no ambiente e execute atrás de um servidor WSGI. Não use o modo de depuração em produção.
 
-## 📈 Melhorias Futuras
+## Formato recomendado da ficha
 
-- Geolocalização das feiras
-- Favoritos
-- Fotos dos produtos
-- Controle de estoque
-- Painel administrativo
-- Notificações
-- Integração com WhatsApp
-- Pagamentos via PIX
+Use uma linha por campo para aumentar a precisão do OCR:
+
+```text
+PRODUTO: Tomate
+QUANTIDADE: 2 KG
+PREÇO: R$ 8,50
+```
+
+Após a leitura, informe também o nome e o telefone/WhatsApp do produtor na tela de revisão.
+
+## Próximas evoluções
+
+- Autenticação para separar os anúncios por produtor.
+- Fotos próprias do produto, estoque e edição/exclusão de anúncios.
+- Geolocalização de feiras e filtros por região.
+- Integração de WhatsApp e pagamentos via PIX.
+- Migração para PostgreSQL quando houver múltiplos usuários simultâneos.
