@@ -61,14 +61,6 @@ Depois de iniciar a aplicação e publicar um anúncio, use o script incluído:
 
 ```bash
 python ver_banco.py
-```
-
-Ele mostra os produtos, seus produtores e categorias. Para outras consultas,
-use `python ver_banco.py produtores`, `python ver_banco.py categorias` ou
-`python ver_banco.py tabelas`.
-
-Para produção, defina uma `SECRET_KEY` forte no ambiente e execute atrás de um servidor WSGI. Não use o modo de depuração em produção.
-
 ## Formato recomendado da ficha
 
 Use uma linha por campo para aumentar a precisão do OCR:
