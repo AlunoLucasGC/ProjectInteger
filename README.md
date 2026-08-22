@@ -21,7 +21,8 @@ Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
 
 - **Interface Flask:** páginas de catálogo, envio e revisão.
 - **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura.
-- **Persistência:** SQLite armazena os anúncios publicados para o MVP.
+- **Persistência:** um único arquivo SQLite (`feira_facil.db`) armazena produtores,
+  categorias e produtos, com chaves estrangeiras ativadas em cada conexão.
 - **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
 
 ## Como executar
@@ -40,6 +41,31 @@ Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
    ```
 
 4. Acesse `http://127.0.0.1:5000`.
+
+### Banco de dados
+
+O esquema SQLite está versionado em [`database.sql`](database.sql) e é criado
+automaticamente ao iniciar a aplicação. Não é necessário instalar ou configurar
+um servidor MySQL: basta manter o arquivo `feira_facil.db` junto da aplicação.
+
+Ao atualizar uma instalação que usava a tabela local antiga `produtos`, a
+aplicação importa seus anúncios uma única vez para `tb_produtores`,
+`tb_categorias` e `tb_produtos`. Os novos anúncios sem categoria explícita ficam
+em **Sem categoria**, preservando o fluxo atual da interface.
+
+### Consultar o banco no Windows
+
+O arquivo `feira_facil.db` é binário, portanto é normal que o VS Code não consiga
+exibi-lo como texto. Também não é obrigatório instalar o comando `sqlite3`.
+Depois de iniciar a aplicação e publicar um anúncio, use o script incluído:
+
+```bash
+python ver_banco.py
+```
+
+Ele mostra os produtos, seus produtores e categorias. Para outras consultas,
+use `python ver_banco.py produtores`, `python ver_banco.py categorias` ou
+`python ver_banco.py tabelas`.
 
 Para produção, defina uma `SECRET_KEY` forte no ambiente e execute atrás de um servidor WSGI. Não use o modo de depuração em produção.
 
