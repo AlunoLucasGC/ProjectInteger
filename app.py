@@ -6,13 +6,17 @@ publicar o anúncio no catálogo. O SQLite foi escolhido para manter o MVP simpl
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
+import unicodedata
 import uuid
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Final
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from flask import Flask, flash, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -25,6 +29,9 @@ SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
+UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
+PHOTO_CACHE_FOLDER: Final = UPLOAD_FOLDER / "catalogo"
+PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
 
 
 def get_connection() -> sqlite3.Connection:
@@ -93,6 +100,63 @@ def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
 def allowed_file(filename: str) -> bool:
     """Impede que arquivos que não são imagens sejam salvos no servidor."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _photo_cache_name(product_name: str) -> str:
+    """Cria um nome previsível e seguro para uma foto genérica em cache."""
+    normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
+    slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
+    return f"{slug}.jpg"
+
+
+def buscar_foto_generica(product_name: str) -> str | None:
+    """Baixa uma foto de produto da API do Unsplash e guarda uma miniatura.
+
+    A imagem é armazenada localmente para evitar uma consulta externa a cada
+    visualização do catálogo. É necessário configurar ``UNSPLASH_ACCESS_KEY``;
+    a busca é feita só quando um nome ainda não tem foto em cache e falhas de
+    rede não impedem a publicação do anúncio.
+    """
+    PHOTO_CACHE_FOLDER.mkdir(exist_ok=True)
+    cache_name = _photo_cache_name(product_name)
+    cache_path = PHOTO_CACHE_FOLDER / cache_name
+    if cache_path.is_file():
+        return f"catalogo/{cache_name}"
+
+    access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
+    if not access_key:
+        return None
+
+    params = urlencode(
+        {
+            "query": f"{product_name} fresh produce",
+            "per_page": "1",
+            "orientation": "landscape",
+            "content_filter": "high",
+        }
+    )
+    try:
+        api_request = Request(
+            f"{UNSPLASH_API_URL}?{params}",
+            headers={
+                "Authorization": f"Client-ID {access_key}",
+                "User-Agent": "FeiraFacil/1.0 (catalogo de produtos rurais)",
+            },
+        )
+        with urlopen(api_request, timeout=5) as response:
+            photos = json.load(response).get("results", [])
+        if not photos:
+            return None
+        image_url = photos[0]["urls"]["small"]
+        image_request = Request(image_url, headers={"User-Agent": "FeiraFacil/1.0"})
+        with urlopen(image_request, timeout=10) as response:
+            image = response.read(2 * 1024 * 1024 + 1)
+        if not image or len(image) > 2 * 1024 * 1024:
+            return None
+        cache_path.write_bytes(image)
+        return f"catalogo/{cache_name}"
+    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        return None
 
 
 def melhorar_imagem(caminho: Path) -> Path:
@@ -245,6 +309,7 @@ def publicar_produto():
             flash(error, "error")
         return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem=request.form.get("imagem", "")), 400
 
+    foto_generica = buscar_foto_generica(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
@@ -273,7 +338,7 @@ def publicar_produto():
                 dados["quantidade"],
                 dados["unidade"],
                 dados["preco"],
-                request.form.get("imagem") or None,
+                foto_generica,
                 request.form.get("imagem") or None,
             ),
         )
