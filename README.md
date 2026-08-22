@@ -11,16 +11,18 @@ O **Feira Fácil** é um MVP para aproximar produtores rurais e consumidores. O 
 - Extração de produto, quantidade, unidade e preço.
 - Tela de revisão editável: o OCR nunca publica dados sem confirmação.
 - Validação dos dados e armazenamento local em SQLite.
+- Foto genérica real do produto: ao publicar, o sistema consulta o Wikimedia Commons e guarda localmente uma versão reduzida da imagem encontrada.
 - Catálogo público com busca por produto ou produtor e botão de contato direto.
 
 ## Arquitetura
 
 ```text
-Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
+Navegador → Flask → OpenCV + EasyOCR → revisão → Wikimedia Commons → SQLite → catálogo
 ```
 
 - **Interface Flask:** páginas de catálogo, envio e revisão.
 - **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura.
+- **Fotos do catálogo:** depois da revisão, uma busca pelo nome do produto é enviada à API pública do Wikimedia Commons, sem chave de API. O app baixa no máximo 2 MB e salva a miniatura em `uploads/catalogo/`; novos anúncios com o mesmo produto reutilizam a foto. Se a API estiver indisponível ou não encontrar JPEG, o anúncio ainda é publicado com o marcador padrão.
 - **Persistência:** um único arquivo SQLite (`feira_facil.db`) armazena produtores,
   categorias e produtos, com chaves estrangeiras ativadas em cada conexão.
 - **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
