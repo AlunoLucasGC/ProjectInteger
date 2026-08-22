@@ -38,13 +38,19 @@ Navegador → Flask → OpenCV + EasyOCR → revisão → Flickr → SQLite → 
    python -m pip install -r requirements.txt
    ```
 
-3. Inicie a aplicação:
+3. Para ativar as fotos genéricas, configure a chave de acesso do Unsplash:
+
+   ```bash
+   export UNSPLASH_ACCESS_KEY="sua_chave_do_unsplash"
+   ```
+
+4. Inicie a aplicação:
 
    ```bash
    python app.py
    ```
 
-4. Acesse `http://127.0.0.1:5000`.
+5. Acesse `http://127.0.0.1:5000`.
 
 ### Desempenho
 
