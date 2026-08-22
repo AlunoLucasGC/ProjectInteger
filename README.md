@@ -11,16 +11,20 @@ O **Feira Fácil** é um MVP para aproximar produtores rurais e consumidores. O 
 - Extração de produto, quantidade, unidade e preço.
 - Tela de revisão editável: o OCR nunca publica dados sem confirmação.
 - Validação dos dados e armazenamento local em SQLite.
+- Foto genérica real do produto: no cadastro, o sistema gera uma URL fixa de foto rural do Flickr a partir do nome do produto.
+- Exclusão de anúncios diretamente pelo catálogo.
 - Catálogo público com busca por produto ou produtor e botão de contato direto.
 
 ## Arquitetura
 
 ```text
-Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
+Navegador → Flask → OpenCV + EasyOCR → revisão → Flickr → SQLite → catálogo
 ```
 
 - **Interface Flask:** páginas de catálogo, envio e revisão.
-- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura.
+- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura. O modelo do EasyOCR é carregado uma única vez e reutilizado nos próximos cadastros, o que elimina a maior fonte de demora após a primeira leitura.
+- **Fotos do catálogo:** depois da revisão, o app monta e salva uma URL fixa do LoremFlickr com o nome do produto e a tag `food`. A foto é carregada pelo elemento `<img>` do navegador, sem requisição AJAX; por isso CORS não interfere. Não há chave de API, download nem arquivo de foto genérica no servidor.
+- **Arquivos temporários:** a foto da ficha e a versão tratada pelo OCR são apagadas ao fim da leitura, mesmo se o OCR falhar. Elas não são guardadas na tabela `tb_produtos`.
 - **Persistência:** um único arquivo SQLite (`feira_facil.db`) armazena produtores,
   categorias e produtos, com chaves estrangeiras ativadas em cada conexão.
 - **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
@@ -41,6 +45,10 @@ Navegador → Flask → OpenCV + EasyOCR → revisão → SQLite → catálogo
    ```
 
 4. Acesse `http://127.0.0.1:5000`.
+
+### Desempenho
+
+O primeiro cadastro pode levar mais tempo porque o EasyOCR precisa carregar o modelo em memória. Os cadastros seguintes reutilizam o mesmo leitor. A duração de cada OCR é registrada no log da aplicação como `OCR concluído em ... s`; isso permite separar uma demora de OCR de qualquer operação de banco. O SQLite abre uma conexão local curta por requisição e não realiza acesso de rede.
 
 ### Banco de dados
 

@@ -6,13 +6,18 @@ publicar o anúncio no catálogo. O SQLite foi escolhido para manter o MVP simpl
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sqlite3
+import unicodedata
 import uuid
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
+from time import perf_counter
 from typing import Final
+from urllib.parse import quote
 
 from flask import Flask, flash, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -25,6 +30,8 @@ SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
+PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
+PHOTO_SOURCE_URL: Final = "https://loremflickr.com/640/480/{tags}?lock={lock}"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -95,6 +102,19 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def buscar_foto_generica(product_name: str) -> str:
+    """Gera uma URL fixa de foto real do Flickr para o anúncio recém-criado.
+
+    A imagem é carregada pelo navegador como uma imagem comum, não por XHR;
+    portanto CORS não bloqueia sua exibição. O parâmetro ``lock`` mantém a
+    mesma foto para o produto após o cadastro, sem baixar arquivos ao servidor.
+    """
+    normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
+    slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
+    lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
+    return PHOTO_SOURCE_URL.format(tags=quote(f"{slug},food"), lock=lock)
+
+
 def melhorar_imagem(caminho: Path) -> Path:
     """Aumenta contraste e tamanho da foto para tornar o OCR mais confiável."""
     import cv2  # Importação tardia: as páginas sem OCR funcionam sem OpenCV.
@@ -111,6 +131,16 @@ def melhorar_imagem(caminho: Path) -> Path:
     if not cv2.imwrite(str(tratada), binaria):
         raise ValueError("Não foi possível preparar a imagem para leitura.")
     return tratada
+
+
+@lru_cache(maxsize=1)
+def get_ocr_reader():
+    """Inicializa o modelo uma única vez, evitando recarga a cada cadastro."""
+    try:
+        import easyocr
+    except ImportError as error:
+        raise RuntimeError("OCR indisponível. Instale as dependências com pip install -r requirements.txt.") from error
+    return easyocr.Reader(["pt"], gpu=False)
 
 
 def corrigir_ocr(texto: str) -> str:
@@ -143,14 +173,11 @@ def organizar_produto(texto: str) -> dict[str, str]:
 
 def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
     """Executa OCR e devolve os campos encontrados e o texto bruto para auditoria."""
-    try:
-        import easyocr
-    except ImportError as error:
-        raise RuntimeError("OCR indisponível. Instale as dependências com pip install -r requirements.txt.") from error
-
-    leitor = easyocr.Reader(["pt"], gpu=False)
+    inicio = perf_counter()
+    leitor = get_ocr_reader()
     textos = leitor.readtext(str(melhorar_imagem(caminho)), detail=0, paragraph=True)
     texto = "\n".join(textos)
+    app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
     return organizar_produto(corrigir_ocr(texto)), texto
 
 
@@ -233,7 +260,10 @@ def executar_ocr():
     except (RuntimeError, ValueError) as error:
         flash(str(error), "error")
         return redirect(url_for("cadastro"))
-    return render_template("resultado.html", dados=dados, texto=texto, imagem=caminho.name)
+    finally:
+        caminho.unlink(missing_ok=True)
+        caminho.with_stem(f"{caminho.stem}_tratada").unlink(missing_ok=True)
+    return render_template("resultado.html", dados=dados, texto=texto, imagem="")
 
 
 @app.post("/publicar")
@@ -245,6 +275,7 @@ def publicar_produto():
             flash(error, "error")
         return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem=request.form.get("imagem", "")), 400
 
+    foto_generica = buscar_foto_generica(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
@@ -273,11 +304,20 @@ def publicar_produto():
                 dados["quantidade"],
                 dados["unidade"],
                 dados["preco"],
-                request.form.get("imagem") or None,
-                request.form.get("imagem") or None,
+                foto_generica,
+                None,
             ),
         )
     flash("Produto publicado e disponível para consumidores!", "success")
+    return redirect(url_for("pagina_inicial"))
+
+
+@app.post("/produtos/<int:product_id>/excluir")
+def excluir_produto(product_id: int):
+    """Remove um anúncio do catálogo e mantém os dados de outros produtores."""
+    with get_connection() as connection:
+        deleted = connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,)).rowcount
+    flash("Produto excluído do catálogo." if deleted else "Produto não encontrado.", "success" if deleted else "error")
     return redirect(url_for("pagina_inicial"))
 
 

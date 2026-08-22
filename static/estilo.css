@@ -150,6 +150,9 @@ button, .producer-link, .contact { -webkit-tap-highlight-color: transparent; }
 .product-body strong { color: var(--verde-escuro); font-size: 1.15rem; }
 .contact { margin-top: 8px; border: 1px solid var(--verde); color: var(--verde-escuro); }
 .contact:hover { background: var(--verde-claro); }
+.product-body form { margin-top: 4px; }
+.delete-product { width: 100%; min-height: 38px; border: 1px solid var(--erro); border-radius: 10px; background: #fff; color: var(--erro); cursor: pointer; font-size: .85rem; }
+.delete-product:hover { background: #fce9e8; }
 
 .empty-state, .form-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); }
 .empty-state { display: grid; justify-items: start; gap: 12px; padding: clamp(24px, 5vw, 44px); }
