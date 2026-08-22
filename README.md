@@ -69,6 +69,23 @@ use `python ver_banco.py produtores`, `python ver_banco.py categorias` ou
 
 Para produção, defina uma `SECRET_KEY` forte no ambiente e execute atrás de um servidor WSGI. Não use o modo de depuração em produção.
 
+O esquema SQLite está versionado em [`database.sql`](database.sql) e é criado
+automaticamente ao iniciar a aplicação. Não é necessário instalar ou configurar
+um servidor MySQL: basta manter o arquivo `feira_facil.db` junto da aplicação.
+
+Ao atualizar uma instalação que usava a tabela local antiga `produtos`, a
+aplicação importa seus anúncios uma única vez para `tb_produtores`,
+`tb_categorias` e `tb_produtos`. Os novos anúncios sem categoria explícita ficam
+em **Sem categoria**, preservando o fluxo atual da interface.
+
+### Consultar o banco no Windows
+
+O arquivo `feira_facil.db` é binário, portanto é normal que o VS Code não consiga
+exibi-lo como texto. Também não é obrigatório instalar o comando `sqlite3`.
+Depois de iniciar a aplicação e publicar um anúncio, use o script incluído:
+
+```bash
+python ver_banco.py
 ## Formato recomendado da ficha
 
 Use uma linha por campo para aumentar a precisão do OCR:
