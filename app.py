@@ -29,7 +29,7 @@ SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
-COMMONS_API_URL: Final = "https://commons.wikimedia.org/w/api.php"
+UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
 PHOTO_CACHE_FOLDER: Final = UPLOAD_FOLDER / "catalogo"
 PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
 
@@ -110,11 +110,12 @@ def _photo_cache_name(product_name: str) -> str:
 
 
 def buscar_foto_generica(product_name: str) -> str | None:
-    """Baixa uma foto de produto do Wikimedia Commons, sem exigir chave de API.
+    """Baixa uma foto de produto da API do Unsplash e guarda uma miniatura.
 
     A imagem é armazenada localmente para evitar uma consulta externa a cada
-    visualização do catálogo. A busca é feita só quando um nome ainda não tem
-    foto em cache e falhas de rede não impedem a publicação do anúncio.
+    visualização do catálogo. É necessário configurar ``UNSPLASH_ACCESS_KEY``;
+    a busca é feita só quando um nome ainda não tem foto em cache e falhas de
+    rede não impedem a publicação do anúncio.
     """
     PHOTO_CACHE_FOLDER.mkdir(exist_ok=True)
     cache_name = _photo_cache_name(product_name)
@@ -122,35 +123,31 @@ def buscar_foto_generica(product_name: str) -> str | None:
     if cache_path.is_file():
         return f"catalogo/{cache_name}"
 
+    access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
+    if not access_key:
+        return None
+
     params = urlencode(
         {
-            "action": "query",
-            "format": "json",
-            "generator": "search",
-            "gsrsearch": product_name,
-            "gsrnamespace": "6",
-            "gsrlimit": "5",
-            "prop": "imageinfo",
-            "iiprop": "url|mime",
-            "iiurlwidth": "640",
-            "origin": "*",
+            "query": f"{product_name} fresh produce",
+            "per_page": "1",
+            "orientation": "landscape",
+            "content_filter": "high",
         }
     )
     try:
         api_request = Request(
-            f"{COMMONS_API_URL}?{params}",
-            headers={"User-Agent": "FeiraFacil/1.0 (catalogo de produtos rurais)"},
+            f"{UNSPLASH_API_URL}?{params}",
+            headers={
+                "Authorization": f"Client-ID {access_key}",
+                "User-Agent": "FeiraFacil/1.0 (catalogo de produtos rurais)",
+            },
         )
         with urlopen(api_request, timeout=5) as response:
-            pages = json.load(response).get("query", {}).get("pages", {}).values()
-        candidates = [
-            page["imageinfo"][0]
-            for page in pages
-            if page.get("imageinfo") and page["imageinfo"][0].get("mime") == "image/jpeg"
-        ]
-        if not candidates:
+            photos = json.load(response).get("results", [])
+        if not photos:
             return None
-        image_url = candidates[0].get("thumburl") or candidates[0]["url"]
+        image_url = photos[0]["urls"]["small"]
         image_request = Request(image_url, headers={"User-Agent": "FeiraFacil/1.0"})
         with urlopen(image_request, timeout=10) as response:
             image = response.read(2 * 1024 * 1024 + 1)
