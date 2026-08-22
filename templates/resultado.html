@@ -18,7 +18,6 @@
       {% endwith %}
       <!-- Os campos ficam editáveis para que o produtor corrija qualquer leitura do OCR. -->
       <form action="{{ url_for('publicar_produto') }}" method="post">
-        <input type="hidden" name="imagem" value="{{ imagem }}">
         <input type="hidden" name="texto" value="{{ texto }}">
         <label for="produto">Produto</label>
         <input id="produto" name="produto" value="{{ dados.produto }}" maxlength="100" required>

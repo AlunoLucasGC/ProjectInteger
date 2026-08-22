@@ -6,17 +6,18 @@ publicar o anúncio no catálogo. O SQLite foi escolhido para manter o MVP simpl
 
 from __future__ import annotations
 
-import json
+import hashlib
 import os
 import re
 import sqlite3
 import unicodedata
 import uuid
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
+from time import perf_counter
 from typing import Final
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import quote
 
 from flask import Flask, flash, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -29,9 +30,8 @@ SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
-UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
-PHOTO_CACHE_FOLDER: Final = UPLOAD_FOLDER / "catalogo"
 PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
+PHOTO_SOURCE_URL: Final = "https://loremflickr.com/640/480/{tags}?lock={lock}"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -102,61 +102,17 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _photo_cache_name(product_name: str) -> str:
-    """Cria um nome previsível e seguro para uma foto genérica em cache."""
+def buscar_foto_generica(product_name: str) -> str:
+    """Gera uma URL fixa de foto real do Flickr para o anúncio recém-criado.
+
+    A imagem é carregada pelo navegador como uma imagem comum, não por XHR;
+    portanto CORS não bloqueia sua exibição. O parâmetro ``lock`` mantém a
+    mesma foto para o produto após o cadastro, sem baixar arquivos ao servidor.
+    """
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
     slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
-    return f"{slug}.jpg"
-
-
-def buscar_foto_generica(product_name: str) -> str | None:
-    """Baixa uma foto de produto da API do Unsplash e guarda uma miniatura.
-
-    A imagem é armazenada localmente para evitar uma consulta externa a cada
-    visualização do catálogo. É necessário configurar ``UNSPLASH_ACCESS_KEY``;
-    a busca é feita só quando um nome ainda não tem foto em cache e falhas de
-    rede não impedem a publicação do anúncio.
-    """
-    PHOTO_CACHE_FOLDER.mkdir(exist_ok=True)
-    cache_name = _photo_cache_name(product_name)
-    cache_path = PHOTO_CACHE_FOLDER / cache_name
-    if cache_path.is_file():
-        return f"catalogo/{cache_name}"
-
-    access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
-    if not access_key:
-        return None
-
-    params = urlencode(
-        {
-            "query": f"{product_name} fresh produce",
-            "per_page": "1",
-            "orientation": "landscape",
-            "content_filter": "high",
-        }
-    )
-    try:
-        api_request = Request(
-            f"{UNSPLASH_API_URL}?{params}",
-            headers={
-                "Authorization": f"Client-ID {access_key}",
-                "User-Agent": "FeiraFacil/1.0 (catalogo de produtos rurais)",
-            },
-        )
-        with urlopen(api_request, timeout=5) as response:
-            photos = json.load(response).get("results", [])
-        if not photos:
-            return None
-        image_url = photos[0]["urls"]["small"]
-        image_request = Request(image_url, headers={"User-Agent": "FeiraFacil/1.0"})
-        with urlopen(image_request, timeout=10) as response:
-            image = response.read(2 * 1024 * 1024 + 1)
-        if not image or len(image) > 2 * 1024 * 1024:
-            return None
-        cache_path.write_bytes(image)
-        return f"catalogo/{cache_name}"
-    except (OSError, ValueError, KeyError, json.JSONDecodeError):
-        return None
+    lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
+    return PHOTO_SOURCE_URL.format(tags=quote(f"{slug},food"), lock=lock)
 
 
 def melhorar_imagem(caminho: Path) -> Path:
@@ -175,6 +131,16 @@ def melhorar_imagem(caminho: Path) -> Path:
     if not cv2.imwrite(str(tratada), binaria):
         raise ValueError("Não foi possível preparar a imagem para leitura.")
     return tratada
+
+
+@lru_cache(maxsize=1)
+def get_ocr_reader():
+    """Inicializa o modelo uma única vez, evitando recarga a cada cadastro."""
+    try:
+        import easyocr
+    except ImportError as error:
+        raise RuntimeError("OCR indisponível. Instale as dependências com pip install -r requirements.txt.") from error
+    return easyocr.Reader(["pt"], gpu=False)
 
 
 def corrigir_ocr(texto: str) -> str:
@@ -207,14 +173,11 @@ def organizar_produto(texto: str) -> dict[str, str]:
 
 def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
     """Executa OCR e devolve os campos encontrados e o texto bruto para auditoria."""
-    try:
-        import easyocr
-    except ImportError as error:
-        raise RuntimeError("OCR indisponível. Instale as dependências com pip install -r requirements.txt.") from error
-
-    leitor = easyocr.Reader(["pt"], gpu=False)
+    inicio = perf_counter()
+    leitor = get_ocr_reader()
     textos = leitor.readtext(str(melhorar_imagem(caminho)), detail=0, paragraph=True)
     texto = "\n".join(textos)
+    app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
     return organizar_produto(corrigir_ocr(texto)), texto
 
 
@@ -297,7 +260,10 @@ def executar_ocr():
     except (RuntimeError, ValueError) as error:
         flash(str(error), "error")
         return redirect(url_for("cadastro"))
-    return render_template("resultado.html", dados=dados, texto=texto, imagem=caminho.name)
+    finally:
+        caminho.unlink(missing_ok=True)
+        caminho.with_stem(f"{caminho.stem}_tratada").unlink(missing_ok=True)
+    return render_template("resultado.html", dados=dados, texto=texto, imagem="")
 
 
 @app.post("/publicar")
@@ -339,10 +305,19 @@ def publicar_produto():
                 dados["unidade"],
                 dados["preco"],
                 foto_generica,
-                request.form.get("imagem") or None,
+                None,
             ),
         )
     flash("Produto publicado e disponível para consumidores!", "success")
+    return redirect(url_for("pagina_inicial"))
+
+
+@app.post("/produtos/<int:product_id>/excluir")
+def excluir_produto(product_id: int):
+    """Remove um anúncio do catálogo e mantém os dados de outros produtores."""
+    with get_connection() as connection:
+        deleted = connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,)).rowcount
+    flash("Produto excluído do catálogo." if deleted else "Produto não encontrado.", "success" if deleted else "error")
     return redirect(url_for("pagina_inicial"))
 
 

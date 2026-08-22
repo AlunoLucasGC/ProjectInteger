@@ -11,18 +11,20 @@ O **Feira Fácil** é um MVP para aproximar produtores rurais e consumidores. O 
 - Extração de produto, quantidade, unidade e preço.
 - Tela de revisão editável: o OCR nunca publica dados sem confirmação.
 - Validação dos dados e armazenamento local em SQLite.
-- Foto genérica real do produto: ao publicar, o sistema consulta a API do Unsplash e guarda localmente uma versão reduzida da imagem encontrada.
+- Foto genérica real do produto: no cadastro, o sistema gera uma URL fixa de foto rural do Flickr a partir do nome do produto.
+- Exclusão de anúncios diretamente pelo catálogo.
 - Catálogo público com busca por produto ou produtor e botão de contato direto.
 
 ## Arquitetura
 
 ```text
-Navegador → Flask → OpenCV + EasyOCR → revisão → Unsplash → SQLite → catálogo
+Navegador → Flask → OpenCV + EasyOCR → revisão → Flickr → SQLite → catálogo
 ```
 
 - **Interface Flask:** páginas de catálogo, envio e revisão.
-- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura.
-- **Fotos do catálogo:** depois da revisão, uma busca pelo nome do produto é enviada à API do Unsplash. Crie uma chave em [Unsplash Developers](https://unsplash.com/developers) e defina `UNSPLASH_ACCESS_KEY` antes de iniciar o app. O app baixa no máximo 2 MB e salva a miniatura em `uploads/catalogo/`; novos anúncios com o mesmo produto reutilizam a foto. Se a chave não estiver configurada, a API estiver indisponível ou não houver resultado, o anúncio ainda é publicado com o marcador padrão.
+- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura. O modelo do EasyOCR é carregado uma única vez e reutilizado nos próximos cadastros, o que elimina a maior fonte de demora após a primeira leitura.
+- **Fotos do catálogo:** depois da revisão, o app monta e salva uma URL fixa do LoremFlickr com o nome do produto e a tag `food`. A foto é carregada pelo elemento `<img>` do navegador, sem requisição AJAX; por isso CORS não interfere. Não há chave de API, download nem arquivo de foto genérica no servidor.
+- **Arquivos temporários:** a foto da ficha e a versão tratada pelo OCR são apagadas ao fim da leitura, mesmo se o OCR falhar. Elas não são guardadas na tabela `tb_produtos`.
 - **Persistência:** um único arquivo SQLite (`feira_facil.db`) armazena produtores,
   categorias e produtos, com chaves estrangeiras ativadas em cada conexão.
 - **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
@@ -49,6 +51,10 @@ Navegador → Flask → OpenCV + EasyOCR → revisão → Unsplash → SQLite �
    ```
 
 5. Acesse `http://127.0.0.1:5000`.
+
+### Desempenho
+
+O primeiro cadastro pode levar mais tempo porque o EasyOCR precisa carregar o modelo em memória. Os cadastros seguintes reutilizam o mesmo leitor. A duração de cada OCR é registrada no log da aplicação como `OCR concluído em ... s`; isso permite separar uma demora de OCR de qualquer operação de banco. O SQLite abre uma conexão local curta por requisição e não realiza acesso de rede.
 
 ### Banco de dados
 
