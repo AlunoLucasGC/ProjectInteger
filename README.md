@@ -1,108 +1,160 @@
 # 🌱 Feira Fácil
 
-O **Feira Fácil** é um MVP para aproximar produtores rurais e consumidores. O produtor envia uma foto de uma ficha padronizada; o sistema usa OCR para sugerir os dados do anúncio; e o produtor revisa tudo antes da publicação.
+> MVP de um catálogo de produtos rurais que transforma fichas preenchidas em anúncios publicados após revisão do produtor.
 
-> Este projeto não usa IA generativa. O reconhecimento é feito por OCR local com EasyOCR e pré-processamento de imagem com OpenCV.
+[![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.x-black?logo=flask)](https://flask.palletsprojects.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-database-003B57?logo=sqlite)](https://www.sqlite.org/)
+[![OpenCV](https://img.shields.io/badge/OpenCV-image%20processing-5C3EE8?logo=opencv)](https://opencv.org/)
 
-## Funcionalidades
+## 📖 Sobre o projeto
 
-- Envio seguro de ficha em JPG, PNG ou WEBP (até 8 MB).
-- Pré-processamento da imagem e OCR em português.
-- Extração de produto, quantidade, unidade e preço.
-- Tela de revisão editável: o OCR nunca publica dados sem confirmação.
-- Validação dos dados e armazenamento local em SQLite.
-- Foto genérica real do produto: no cadastro, o sistema gera uma URL fixa de foto rural do Flickr a partir do nome do produto.
-- Exclusão de anúncios diretamente pelo catálogo.
-- Catálogo público com busca por produto ou produtor e botão de contato direto.
+O **Feira Fácil** foi desenvolvido como projeto integrador do curso de Desenvolvimento de Sistemas. A proposta é aproximar produtores rurais e consumidores por meio de um catálogo simples de produtos locais.
 
-## Arquitetura
+O diferencial do MVP é o fluxo de cadastro: o produtor envia uma foto de uma ficha padronizada, o sistema realiza OCR para sugerir os dados, o produtor revisa as informações e somente então o anúncio é publicado no catálogo.
+
+**Importante:** o projeto não utiliza IA generativa. O reconhecimento de texto é realizado localmente com **EasyOCR**, enquanto o **OpenCV** faz o pré-processamento da imagem.
+
+## ✨ Funcionalidades
+
+- 📷 Upload de fichas em JPG, JPEG, PNG e WEBP.
+- 🔎 Leitura da ficha com OCR em português.
+- 🧹 Pré-processamento da imagem para melhorar a leitura.
+- ✏️ Revisão e correção dos dados antes da publicação.
+- ✅ Validação de produto, quantidade, unidade, preço e dados do produtor.
+- 🛒 Catálogo público de produtos disponíveis.
+- 🔍 Busca por produto ou produtor.
+- 📞 Contato direto com o produtor.
+- 🗑️ Exclusão de anúncios.
+- 💾 Persistência em banco SQLite.
+- 🔐 Validação de extensão, nome seguro do arquivo e limite de upload de 8 MB.
+- 🧹 Remoção dos arquivos temporários utilizados pelo OCR após o processamento.
+
+## 🧠 Fluxo da aplicação
 
 ```text
-Navegador → Flask → OpenCV + EasyOCR → revisão → Flickr → SQLite → catálogo
+┌─────────────────┐
+│ Produtor envia  │
+│ foto da ficha   │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│   OpenCV        │
+│ Pré-processa    │
+│     imagem      │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│    EasyOCR      │
+│ Extrai o texto  │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│ Organiza dados  │
+│ produto/preço/  │
+│ quantidade/etc. │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│     Revisão     │
+│ pelo produtor   │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│    Validação    │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│     SQLite      │
+│ Salva anúncio   │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│    Catálogo     │
+│    público      │
+└─────────────────┘
 ```
 
-- **Interface Flask:** páginas de catálogo, envio e revisão.
-- **OCR:** a imagem é ampliada, convertida para tons de cinza e binarizada antes da leitura. O modelo do EasyOCR é carregado uma única vez e reutilizado nos próximos cadastros, o que elimina a maior fonte de demora após a primeira leitura.
-- **Fotos do catálogo:** depois da revisão, o app monta e salva uma URL fixa do LoremFlickr com o nome do produto e a tag `food`. A foto é carregada pelo elemento `<img>` do navegador, sem requisição AJAX; por isso CORS não interfere. Não há chave de API, download nem arquivo de foto genérica no servidor.
-- **Arquivos temporários:** a foto da ficha e a versão tratada pelo OCR são apagadas ao fim da leitura, mesmo se o OCR falhar. Elas não são guardadas na tabela `tb_produtos`.
-- **Persistência:** um único arquivo SQLite (`feira_facil.db`) armazena produtores,
-  categorias e produtos, com chaves estrangeiras ativadas em cada conexão.
-- **Segurança básica:** extensão permitida, nome de arquivo seguro/único e limite de tamanho do upload.
+## 🏗️ Arquitetura
 
-## Como executar
-
-1. Crie e ative um ambiente virtual.
-2. Instale as dependências:
-
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-
-3. Para ativar as fotos genéricas, configure a chave de acesso do Unsplash:
-
-   ```bash
-   export UNSPLASH_ACCESS_KEY="sua_chave_do_unsplash"
-   ```
-
-4. Inicie a aplicação:
-
-   ```bash
-   python app.py
-   ```
-
-5. Acesse `http://127.0.0.1:5000`.
-
-### Desempenho
-
-O primeiro cadastro pode levar mais tempo porque o EasyOCR precisa carregar o modelo em memória. Os cadastros seguintes reutilizam o mesmo leitor. A duração de cada OCR é registrada no log da aplicação como `OCR concluído em ... s`; isso permite separar uma demora de OCR de qualquer operação de banco. O SQLite abre uma conexão local curta por requisição e não realiza acesso de rede.
-
-### Banco de dados
-
-O esquema SQLite está versionado em [`database.sql`](database.sql) e é criado
-automaticamente ao iniciar a aplicação. Não é necessário instalar ou configurar
-um servidor MySQL: basta manter o arquivo `feira_facil.db` junto da aplicação.
-
-Ao atualizar uma instalação que usava a tabela local antiga `produtos`, a
-aplicação importa seus anúncios uma única vez para `tb_produtores`,
-`tb_categorias` e `tb_produtos`. Os novos anúncios sem categoria explícita ficam
-em **Sem categoria**, preservando o fluxo atual da interface.
-
-### Consultar o banco no Windows
-
-O arquivo `feira_facil.db` é binário, portanto é normal que o VS Code não consiga
-exibi-lo como texto. Também não é obrigatório instalar o comando `sqlite3`.
-Depois de iniciar a aplicação e publicar um anúncio, use o script incluído:
-
-```bash
-python ver_banco.py
+```text
+Navegador
+    ↓
+Flask
+    ├── Templates HTML
+    ├── Validação
+    ├── OCR
+    │    ├── OpenCV
+    │    └── EasyOCR
+    ↓
+SQLite
 ```
 
-Ele mostra os produtos, seus produtores e categorias. Para outras consultas,
-use `python ver_banco.py produtores`, `python ver_banco.py categorias` ou
-`python ver_banco.py tabelas`.
+### Principais componentes
 
-Para produção, defina uma `SECRET_KEY` forte no ambiente e execute atrás de um servidor WSGI. Não use o modo de depuração em produção.
+- **Flask:** servidor web e gerenciamento das rotas.
+- **Jinja2:** renderização das páginas HTML.
+- **OpenCV:** tratamento e preparação das imagens antes do OCR.
+- **EasyOCR:** reconhecimento de texto em português.
+- **SQLite:** armazenamento local de produtores, categorias e produtos.
+- **HTML/CSS:** interface do catálogo e das telas de cadastro/revisão.
 
-O esquema SQLite está versionado em [`database.sql`](database.sql) e é criado
-automaticamente ao iniciar a aplicação. Não é necessário instalar ou configurar
-um servidor MySQL: basta manter o arquivo `feira_facil.db` junto da aplicação.
+## 🛠️ Tecnologias
 
-Ao atualizar uma instalação que usava a tabela local antiga `produtos`, a
-aplicação importa seus anúncios uma única vez para `tb_produtores`,
-`tb_categorias` e `tb_produtos`. Os novos anúncios sem categoria explícita ficam
-em **Sem categoria**, preservando o fluxo atual da interface.
+| Tecnologia | Utilização |
+|---|---|
+| Python | Linguagem principal |
+| Flask | Aplicação web |
+| EasyOCR | Reconhecimento de texto |
+| OpenCV | Processamento de imagens |
+| SQLite | Banco de dados |
+| HTML5 | Estrutura das páginas |
+| CSS3 | Interface |
+| Git/GitHub | Versionamento |
 
-### Consultar o banco no Windows
+As dependências Python estão definidas em [`requirements.txt`](requirements.txt). citeturn8file0
 
-O arquivo `feira_facil.db` é binário, portanto é normal que o VS Code não consiga
-exibi-lo como texto. Também não é obrigatório instalar o comando `sqlite3`.
-Depois de iniciar a aplicação e publicar um anúncio, use o script incluído:
+## 📂 Estrutura do projeto
 
-```bash
-python ver_banco.py
-## Formato recomendado da ficha
+```text
+ProjectInteger/
+│
+├── app.py
+├── database.sql
+├── requirements.txt
+├── ver_banco.py
+├── .gitignore
+│
+├── static/
+│   └── estilo.css
+│
+├── templates/
+│   ├── index.html
+│   ├── cadastro.html
+│   ├── resultado.html
+│   ├── produto.html
+│   └── vendedor.html
+│
+└── uploads/
+```
 
-Use uma linha por campo para aumentar a precisão do OCR:
+O projeto atualmente separa templates, estilos, lógica da aplicação e esquema do banco em arquivos e diretórios próprios. citeturn6file0turn9file0turn10file0
+
+## 🗄️ Banco de dados
+
+O projeto utiliza **SQLite** e cria o banco automaticamente ao iniciar a aplicação. O esquema possui entidades para:
+
+- Produtores
+- Categorias
+- Produtos
+
+Também existem chaves estrangeiras e índices para relacionamento entre produtos, produtores e categorias. citeturn13file0
+
+O arquivo `feira_facil.db` é gerado localmente e não deve ser versionado no Git, conforme o `.gitignore`. citeturn12file0
+
+## 📋 Formato da ficha
+
+Para obter melhores resultados no OCR, a ficha deve utilizar uma linha por campo:
 
 ```text
 PRODUTO: Tomate
@@ -110,12 +162,107 @@ QUANTIDADE: 2 KG
 PREÇO: R$ 8,50
 ```
 
-Após a leitura, informe também o nome e o telefone/WhatsApp do produtor na tela de revisão.
+O sistema extrai os campos principais e apresenta os valores em uma tela de revisão antes de gravá-los no banco. citeturn18file0
 
-## Próximas evoluções
+## ⚙️ Como executar
 
-- Autenticação para separar os anúncios por produtor.
-- Fotos próprias do produto, estoque e edição/exclusão de anúncios.
-- Geolocalização de feiras e filtros por região.
-- Integração de WhatsApp e pagamentos via PIX.
-- Migração para PostgreSQL quando houver múltiplos usuários simultâneos.
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/AlunoLucasGC/ProjectInteger.git
+cd ProjectInteger
+```
+
+### 2. Crie um ambiente virtual
+
+Windows:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Instale as dependências
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 4. Execute a aplicação
+
+```bash
+python app.py
+```
+
+### 5. Acesse no navegador
+
+```text
+http://127.0.0.1:5000
+```
+
+Na primeira utilização do OCR, o EasyOCR pode levar mais tempo para carregar o modelo. O leitor é reutilizado nas próximas leituras para evitar recarregamentos desnecessários. citeturn11file0
+
+## 🔎 Consultando o banco
+
+Depois de executar a aplicação e criar registros, é possível consultar o SQLite pelo script auxiliar:
+
+```bash
+python ver_banco.py
+```
+
+Também é possível consultar categorias, produtores e tabelas:
+
+```bash
+python ver_banco.py produtores
+python ver_banco.py categorias
+python ver_banco.py tabelas
+```
+
+O script foi criado para facilitar a inspeção do banco sem depender do comando `sqlite3` instalado no sistema. citeturn14file0
+
+## 🔒 Boas práticas implementadas
+
+- Limite de 8 MB para uploads.
+- Restrição dos formatos de imagem aceitos.
+- Uso de `secure_filename` para os arquivos enviados.
+- Nome único para arquivos temporários.
+- Exclusão dos arquivos temporários após o OCR.
+- Validação dos dados antes da persistência.
+- Chaves estrangeiras ativadas nas conexões SQLite.
+- `SECRET_KEY` configurável por variável de ambiente para ambientes de produção. citeturn11file0turn13file0
+
+## 🚧 Status
+
+**MVP funcional / em evolução**
+
+O projeto já possui o fluxo principal de cadastro por ficha, OCR, revisão, validação, persistência e catálogo. Algumas telas e funcionalidades adicionais ainda podem ser evoluídas conforme o projeto avance.
+
+## 🔮 Próximas evoluções
+
+- [ ] Autenticação de produtores.
+- [ ] Área individual do produtor.
+- [ ] Edição de anúncios.
+- [ ] Categorias selecionáveis no cadastro.
+- [ ] Geolocalização e filtros por região.
+- [ ] Fotos próprias dos produtos.
+- [ ] Integração com WhatsApp.
+- [ ] Testes automatizados.
+- [ ] Deploy da aplicação.
+- [ ] Migração para PostgreSQL caso a escala do projeto exija.
+
+## 👨‍💻 Autor
+
+**Lucas Goerler Colvero**
+
+Projeto desenvolvido como parte da formação em Desenvolvimento de Sistemas e para construção de portfólio profissional.
+
+---
+
+⭐ Se você gostou do projeto, considere deixar uma estrela no repositório.
