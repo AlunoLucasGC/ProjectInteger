@@ -27,7 +27,8 @@ ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
 PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
-PHOTO_SOURCE_URL: Final = "https://loremflickr.com/640/480/{tags}?lock={lock}"
+UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
+UNSPLASH_SOURCE_URL: Final = "https://source.unsplash.com/featured/640x480/?{query}"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -94,19 +95,50 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def buscar_foto_generica(product_name: str) -> str:
-    """Retorna a foto genérica usada atualmente no catálogo."""
+def _normalizar_termo_imagem(product_name: str) -> str:
+    """Prepara uma busca simples em português para uma fonte de imagens."""
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
-    slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
-    lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
-    return PHOTO_SOURCE_URL.format(tags=quote(f"{slug},food"), lock=lock)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
 
 
-def _normalizar_nome_busca(nome: str) -> str:
-    """Gera termos úteis para uma busca de foto sem perder o nome original."""
-    nome = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode().lower()
-    nome = re.sub(r"[^a-z0-9\s-]", " ", nome)
-    return re.sub(r"\s+", " ", nome).strip()
+def buscar_foto_produto(product_name: str) -> str | None:
+    """Busca uma foto relacionada ao produto.
+
+    Preferimos a API oficial do Unsplash quando UNSPLASH_ACCESS_KEY estiver
+    configurada. Sem chave, não retornamos uma foto aleatória: o catálogo usa
+    um placeholder neutro para não associar um produto a uma imagem errada.
+    """
+    termo = _normalizar_termo_imagem(product_name)
+    if not termo:
+        return None
+
+    access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
+    if not access_key:
+        return None
+
+    try:
+        import requests
+    except ImportError:
+        return None
+
+    try:
+        response = requests.get(
+            UNSPLASH_API_URL,
+            params={"query": f"{termo} alimento", "per_page": 1, "orientation": "squarish"},
+            headers={"Authorization": f"Client-ID {access_key}"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        data = response.json()
+        results = data.get("results", [])
+        if not results:
+            return None
+        photo = results[0]
+        return photo.get("urls", {}).get("small") or photo.get("urls", {}).get("regular")
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        app.logger.exception("Falha ao buscar imagem para produto: %s", product_name)
+        return None
 
 
 def melhorar_imagem(caminho: Path):
@@ -165,13 +197,11 @@ def _normalizar_preco(valor: str) -> str:
     valor = re.sub(r"[^0-9.,]", "", valor)
     if not valor:
         return ""
-
     if "," in valor:
         valor = valor.replace(".", "").replace(",", ".")
     elif valor.count(".") > 1:
         partes = valor.split(".")
         valor = "".join(partes[:-1]) + "." + partes[-1]
-
     try:
         return f"{Decimal(valor):.2f}"
     except InvalidOperation:
@@ -179,7 +209,7 @@ def _normalizar_preco(valor: str) -> str:
 
 
 def _extrair_preco(texto: str) -> str:
-    """Extrai preço tolerando formatos comuns e pequenos erros do OCR."""
+    """Extrai preço tolerando R$, 20R$ e confusões O/Q por 0 do OCR."""
     padroes = [
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)(?:\s*R\s*\$?)?\b",
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+)[OQ](?:\s*R\s*\$?)?\b",
@@ -216,6 +246,7 @@ def organizar_produto(texto: str) -> dict[str, str]:
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
+
     resultado["preco"] = _extrair_preco(texto)
     return resultado
 
@@ -329,9 +360,7 @@ def publicar_produto():
             imagem=request.form.get("imagem", ""),
         ), 400
 
-    # A função atual gera uma imagem genérica baseada em uma URL externa.
-    # Mantida aqui até substituirmos a fonte por uma busca de imagem mais confiável.
-    foto_generica = buscar_foto_generica(dados["produto"])
+    foto_produto = buscar_foto_produto(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
@@ -360,7 +389,7 @@ def publicar_produto():
                 dados["quantidade"],
                 dados["unidade"],
                 dados["preco"],
-                foto_generica,
+                foto_produto,
                 None,
             ),
         )
