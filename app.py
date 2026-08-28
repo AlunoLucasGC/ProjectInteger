@@ -1,8 +1,4 @@
-"""Aplicação Flask do MVP Feira Fácil.
-
-O fluxo principal é: enviar uma ficha, extrair dados com OCR, revisar os campos e
-publicar o anúncio no catálogo. O SQLite foi escolhido para manter o MVP simples.
-"""
+"""Aplicação Flask do MVP Feira Fácil."""
 
 from __future__ import annotations
 
@@ -155,20 +151,18 @@ def _limpar_valor(texto: str) -> str:
 
 
 def _normalizar_preco(valor: str) -> str:
-    """Converte o valor monetário OCR para uma string decimal estável."""
+    """Normaliza um valor monetário sem confundir dígitos válidos."""
     valor = valor.upper().strip()
-    valor = valor.replace("R$", "")
-    valor = valor.replace("RS", "")
+    valor = re.sub(r"\s*R\s*\$?", "", valor)
     valor = re.sub(r"[^0-9.,]", "", valor)
-    valor = valor.replace(",", ".")
+    if not valor:
+        return ""
 
-    # Corrige uma leitura comum do OCR: 2OR$ -> 20.
-    if len(valor) >= 2 and valor.endswith("2"):
-        # Não altera valores válidos; esta regra só será usada no fallback abaixo.
-        pass
-
-    # Se houver mais de um ponto, assume o último como separador decimal.
-    if valor.count(".") > 1:
+    # Trata vírgula como separador decimal. Se houver vários pontos,
+    # conserva o último como separador e junta os anteriores.
+    if "," in valor:
+        valor = valor.replace(".", "").replace(",", ".")
+    elif valor.count(".") > 1:
         partes = valor.split(".")
         valor = "".join(partes[:-1]) + "." + partes[-1]
 
@@ -178,17 +172,19 @@ def _normalizar_preco(valor: str) -> str:
         return ""
 
 
-def _extrair_preco_fallback(texto: str) -> str:
-    """Procura formas alternativas de preço que o OCR costuma produzir."""
+def _extrair_preco(texto: str) -> str:
+    """Extrai preço tolerando R$, 20R$ e confusões O/Q por 0 do OCR."""
     padroes = [
-        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?(\d+(?:[.,]\d+)?)[\s]*R?\$?\b",
-        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?(\d+)[OQ]\s*R?\$?\b",
+        # Caso normal: PREÇO 20, PREÇO 20.00, PREÇO R$ 20, PREÇO 20R$
+        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)(?:\s*R\s*\$?)?\b",
+        # OCR pode juntar símbolo/letra diretamente ao número.
+        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+)[OQ](?:\s*R\s*\$?)?\b",
     ]
     for padrao in padroes:
         encontrado = re.search(padrao, texto, re.IGNORECASE)
         if not encontrado:
             continue
-        bruto = encontrado.group(1).replace("O", "0").replace("Q", "0")
+        bruto = encontrado.group(1).upper().replace("O", "0").replace("Q", "0")
         preco = _normalizar_preco(bruto)
         if preco:
             return preco
@@ -210,28 +206,14 @@ def organizar_produto(texto: str) -> dict[str, str]:
         texto,
         re.IGNORECASE,
     )
-    preco = re.search(
-        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?([\d.,]+)(?:\s*R\$?)?",
-        texto,
-        re.IGNORECASE,
-    )
 
     if produto:
         resultado["produto"] = _limpar_valor(produto.group(1)).title()
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
-    if preco:
-        bruto = preco.group(1)
-        normalizado = _normalizar_preco(bruto)
-        resultado["preco"] = normalizado
 
-    # Se o OCR separou o zero ou confundiu 0/O/Q, tenta um fallback específico.
-    if not resultado["preco"] or (resultado["preco"] == "2.00" and re.search(r"PRE(?:Ç|C)O.*2[OQ]R?\$", texto)):
-        fallback = _extrair_preco_fallback(texto)
-        if fallback:
-            resultado["preco"] = fallback
-
+    resultado["preco"] = _extrair_preco(texto)
     return resultado
 
 
