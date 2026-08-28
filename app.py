@@ -35,7 +35,6 @@ PHOTO_SOURCE_URL: Final = "https://loremflickr.com/640/480/{tags}?lock={lock}"
 
 
 def get_connection() -> sqlite3.Connection:
-    """Abre uma conexão configurada para devolver linhas nomeadas."""
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
@@ -43,7 +42,6 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_database() -> None:
-    """Inicializa o arquivo SQLite e importa anúncios do esquema antigo uma vez."""
     with get_connection() as connection:
         connection.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
         connection.execute("INSERT OR IGNORE INTO tb_categorias (nome) VALUES (?)", ("Sem categoria",))
@@ -60,7 +58,6 @@ def init_database() -> None:
 
 
 def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
-    """Converte a tabela local ``produtos`` do MVP para o esquema normalizado."""
     category_id = connection.execute(
         "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
     ).fetchone()["id_categoria"]
@@ -98,12 +95,10 @@ def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
 
 
 def allowed_file(filename: str) -> bool:
-    """Impede que arquivos que não são imagens sejam salvos no servidor."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def buscar_foto_generica(product_name: str) -> str:
-    """Gera uma URL fixa de foto real do Flickr para o anúncio recém-criado."""
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
     slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
     lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
@@ -111,13 +106,7 @@ def buscar_foto_generica(product_name: str) -> str:
 
 
 def melhorar_imagem(caminho: Path):
-    """Prepara a imagem para OCR e devolve a matriz diretamente, sem criar outro arquivo.
-
-    O processamento anterior salvava a imagem tratada com ``cv2.imwrite``. Isso
-    falhava em algumas instalações do OpenCV, principalmente quando o formato
-    de saída não possuía suporte ao encoder correspondente. Agora o resultado
-    tratado fica apenas em memória e é entregue diretamente ao EasyOCR.
-    """
+    """Prepara a imagem para OCR e devolve uma matriz em memória."""
     import cv2
     import numpy as np
 
@@ -142,7 +131,6 @@ def melhorar_imagem(caminho: Path):
 
 @lru_cache(maxsize=1)
 def get_ocr_reader():
-    """Inicializa o modelo uma única vez, evitando recarga a cada cadastro."""
     try:
         import easyocr
     except ImportError as error:
@@ -151,7 +139,7 @@ def get_ocr_reader():
 
 
 def corrigir_ocr(texto: str) -> str:
-    """Normaliza erros frequentes encontrados nas fichas padronizadas."""
+    """Normaliza ruídos comuns sem alterar palavras acentuadas."""
     texto = texto.upper()
     texto = texto.replace("T0MATE", "TOMATE")
     texto = texto.replace("T0MATO", "TOMATO")
@@ -160,39 +148,46 @@ def corrigir_ocr(texto: str) -> str:
     return texto.replace(",", ".")
 
 
+def _limpar_valor(texto: str) -> str:
+    """Remove pontuação solta no início/fim, preservando acentos."""
+    return texto.strip(" \t\r\n:;,.-_|")
+
+
 def organizar_produto(texto: str) -> dict[str, str]:
-    """Extrai os campos mesmo quando a ficha não possui ':' após os rótulos."""
+    """Extrai produto, quantidade, unidade e preço em formatos variados."""
     resultado = EMPTY_PRODUCT.copy()
     texto = corrigir_ocr(texto)
 
     produto = re.search(
-        r"PRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
+        r"\bPRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
         texto,
         re.IGNORECASE | re.DOTALL,
     )
     quantidade = re.search(
-        r"QUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)",
+        r"\bQUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
         texto,
         re.IGNORECASE,
     )
     preco = re.search(
-        r"PRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?([\d.,]+)\s*R?\$?",
+        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?([\d.,]+)(?:\s*R\$?)?",
         texto,
         re.IGNORECASE,
     )
 
     if produto:
-        resultado["produto"] = produto.group(1).strip(" :\n\t").title()
+        resultado["produto"] = _limpar_valor(produto.group(1)).title()
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
     if preco:
-        resultado["preco"] = preco.group(1).replace(",", ".")
+        valor = preco.group(1).replace(",", ".")
+        # Alguns motores OCR podem separar o zero final de valores como 20R$.
+        # Se houver dígitos imediatamente antes do símbolo monetário, a expressão acima preserva o valor completo.
+        resultado["preco"] = valor
     return resultado
 
 
 def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
-    """Executa OCR e devolve os campos encontrados e o texto bruto para auditoria."""
     inicio = perf_counter()
     leitor = get_ocr_reader()
     imagem = melhorar_imagem(caminho)
@@ -203,7 +198,6 @@ def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
 
 
 def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
-    """Valida e normaliza o que o produtor confirmou antes de gravar no banco."""
     data = {key: form.get(key, "").strip() for key in (*EMPTY_PRODUCT, "produtor", "contato")}
     data["unidade"] = data["unidade"].upper()
     errors: list[str] = []
@@ -242,7 +236,6 @@ init_database()
 
 @app.get("/")
 def pagina_inicial():
-    """Exibe o catálogo, opcionalmente filtrado pelo texto buscado."""
     busca = request.args.get("q", "").strip()
     with get_connection() as connection:
         produtos = connection.execute(
@@ -267,7 +260,6 @@ def cadastro():
 
 @app.post("/ler")
 def executar_ocr():
-    """Salva uma foto validada, lê a ficha e abre a tela de revisão."""
     imagem: FileStorage | None = request.files.get("imagem")
     if not imagem or not imagem.filename:
         flash("Selecione uma imagem da ficha para continuar.", "error")
@@ -293,7 +285,6 @@ def executar_ocr():
 
 @app.post("/publicar")
 def publicar_produto():
-    """Persiste somente os dados revisados e redireciona ao catálogo público."""
     dados, errors = validate_product(request.form)
     if errors:
         for error in errors:
@@ -344,12 +335,11 @@ def publicar_produto():
 
 @app.post("/produtos/<int:product_id>/excluir")
 def excluir_produto(product_id: int):
-    """Remove um anúncio do catálogo."""
     with get_connection() as connection:
-        connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,))
-    flash("Produto removido do catálogo.", "success")
+        deleted = connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,)).rowcount
+    flash("Produto excluído do catálogo." if deleted else "Produto não encontrado.", "success" if deleted else "error")
     return redirect(url_for("pagina_inicial"))
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=os.environ.get("FLASK_DEBUG") == "1")
