@@ -19,7 +19,7 @@ from time import perf_counter
 from typing import Final
 from urllib.parse import quote
 
-from flask import Flask, flash, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, flash, redirect, render_template, request, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -110,11 +110,13 @@ def buscar_foto_generica(product_name: str) -> str:
     return PHOTO_SOURCE_URL.format(tags=quote(f"{slug},food"), lock=lock)
 
 
-def melhorar_imagem(caminho: Path) -> Path:
-    """Prepara a imagem para OCR usando os bytes do arquivo, evitando falhas do cv2.imread.
+def melhorar_imagem(caminho: Path):
+    """Prepara a imagem para OCR e devolve a matriz diretamente, sem criar outro arquivo.
 
-    A leitura por bytes funciona melhor em ambientes Windows e também evita
-    problemas com caminhos temporários que contenham caracteres especiais.
+    O processamento anterior salvava a imagem tratada com ``cv2.imwrite``. Isso
+    falhava em algumas instalações do OpenCV, principalmente quando o formato
+    de saída não possuía suporte ao encoder correspondente. Agora o resultado
+    tratado fica apenas em memória e é entregue diretamente ao EasyOCR.
     """
     import cv2
     import numpy as np
@@ -124,6 +126,9 @@ def melhorar_imagem(caminho: Path) -> Path:
     except OSError as error:
         raise ValueError("Não foi possível ler a imagem enviada.") from error
 
+    if dados.size == 0:
+        raise ValueError("A imagem enviada está vazia ou inválida.")
+
     imagem = cv2.imdecode(dados, cv2.IMREAD_COLOR)
     if imagem is None:
         raise ValueError("Não foi possível abrir a imagem enviada. Tente usar JPG, PNG ou WEBP.")
@@ -132,11 +137,7 @@ def melhorar_imagem(caminho: Path) -> Path:
     cinza = cv2.resize(cinza, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
     _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    tratada = caminho.with_stem(f"{caminho.stem}_tratada")
-    if not cv2.imwrite(str(tratada), binaria):
-        raise ValueError("Não foi possível preparar a imagem para leitura.")
-    return tratada
+    return binaria
 
 
 @lru_cache(maxsize=1)
@@ -164,7 +165,6 @@ def organizar_produto(texto: str) -> dict[str, str]:
     resultado = EMPTY_PRODUCT.copy()
     texto = corrigir_ocr(texto)
 
-    # Aceita tanto "PRODUTO: tomate" quanto "PRODUTO tomate".
     produto = re.search(
         r"PRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
         texto,
@@ -195,14 +195,11 @@ def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
     """Executa OCR e devolve os campos encontrados e o texto bruto para auditoria."""
     inicio = perf_counter()
     leitor = get_ocr_reader()
-    imagem_tratada = melhorar_imagem(caminho)
-    try:
-        textos = leitor.readtext(str(imagem_tratada), detail=0, paragraph=True)
-        texto = "\n".join(textos)
-        app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
-        return organizar_produto(texto), texto
-    finally:
-        imagem_tratada.unlink(missing_ok=True)
+    imagem = melhorar_imagem(caminho)
+    textos = leitor.readtext(imagem, detail=0, paragraph=True)
+    texto = "\n".join(textos)
+    app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
+    return organizar_produto(texto), texto
 
 
 def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
@@ -285,6 +282,7 @@ def executar_ocr():
     try:
         dados, texto = extract_data_from_image(caminho)
     except (RuntimeError, ValueError, OSError) as error:
+        app.logger.exception("Falha ao processar imagem para OCR")
         flash(str(error), "error")
         return redirect(url_for("cadastro"))
     finally:
@@ -346,24 +344,12 @@ def publicar_produto():
 
 @app.post("/produtos/<int:product_id>/excluir")
 def excluir_produto(product_id: int):
-    """Remove um anúncio do catálogo e mantém os dados de outros produtores."""
+    """Remove um anúncio do catálogo."""
     with get_connection() as connection:
-        deleted = connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,)).rowcount
-    flash("Produto excluído do catálogo." if deleted else "Produto não encontrado.", "success" if deleted else "error")
+        connection.execute("DELETE FROM tb_produtos WHERE id_produto = ?", (product_id,))
+    flash("Produto removido do catálogo.", "success")
     return redirect(url_for("pagina_inicial"))
 
 
-@app.get("/uploads/<path:nome>")
-def upload(nome: str):
-    """Entrega somente arquivos do diretório de uploads controlado pela aplicação."""
-    return send_from_directory(UPLOAD_FOLDER, nome)
-
-
-@app.errorhandler(413)
-def arquivo_grande(_error: object):
-    flash("A imagem deve ter no máximo 8 MB.", "error")
-    return redirect(url_for("cadastro"))
-
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(debug=True)
