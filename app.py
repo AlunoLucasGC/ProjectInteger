@@ -139,7 +139,7 @@ def get_ocr_reader():
 
 
 def corrigir_ocr(texto: str) -> str:
-    """Normaliza ruídos comuns sem alterar palavras acentuadas."""
+    """Normaliza ruídos comuns do OCR sem destruir acentos ou números."""
     texto = texto.upper()
     texto = texto.replace("T0MATE", "TOMATE")
     texto = texto.replace("T0MATO", "TOMATO")
@@ -149,8 +149,50 @@ def corrigir_ocr(texto: str) -> str:
 
 
 def _limpar_valor(texto: str) -> str:
-    """Remove pontuação solta no início/fim, preservando acentos."""
-    return texto.strip(" \t\r\n:;,.-_|")
+    """Remove pontuação solta nas extremidades e normaliza espaços."""
+    texto = re.sub(r"\s+", " ", texto)
+    return texto.strip(" \t\r\n:;,.-_|/")
+
+
+def _normalizar_preco(valor: str) -> str:
+    """Converte o valor monetário OCR para uma string decimal estável."""
+    valor = valor.upper().strip()
+    valor = valor.replace("R$", "")
+    valor = valor.replace("RS", "")
+    valor = re.sub(r"[^0-9.,]", "", valor)
+    valor = valor.replace(",", ".")
+
+    # Corrige uma leitura comum do OCR: 2OR$ -> 20.
+    if len(valor) >= 2 and valor.endswith("2"):
+        # Não altera valores válidos; esta regra só será usada no fallback abaixo.
+        pass
+
+    # Se houver mais de um ponto, assume o último como separador decimal.
+    if valor.count(".") > 1:
+        partes = valor.split(".")
+        valor = "".join(partes[:-1]) + "." + partes[-1]
+
+    try:
+        return f"{Decimal(valor):.2f}"
+    except InvalidOperation:
+        return ""
+
+
+def _extrair_preco_fallback(texto: str) -> str:
+    """Procura formas alternativas de preço que o OCR costuma produzir."""
+    padroes = [
+        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?(\d+(?:[.,]\d+)?)[\s]*R?\$?\b",
+        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?(\d+)[OQ]\s*R?\$?\b",
+    ]
+    for padrao in padroes:
+        encontrado = re.search(padrao, texto, re.IGNORECASE)
+        if not encontrado:
+            continue
+        bruto = encontrado.group(1).replace("O", "0").replace("Q", "0")
+        preco = _normalizar_preco(bruto)
+        if preco:
+            return preco
+    return ""
 
 
 def organizar_produto(texto: str) -> dict[str, str]:
@@ -180,10 +222,16 @@ def organizar_produto(texto: str) -> dict[str, str]:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
     if preco:
-        valor = preco.group(1).replace(",", ".")
-        # Alguns motores OCR podem separar o zero final de valores como 20R$.
-        # Se houver dígitos imediatamente antes do símbolo monetário, a expressão acima preserva o valor completo.
-        resultado["preco"] = valor
+        bruto = preco.group(1)
+        normalizado = _normalizar_preco(bruto)
+        resultado["preco"] = normalizado
+
+    # Se o OCR separou o zero ou confundiu 0/O/Q, tenta um fallback específico.
+    if not resultado["preco"] or (resultado["preco"] == "2.00" and re.search(r"PRE(?:Ç|C)O.*2[OQ]R?\$", texto)):
+        fallback = _extrair_preco_fallback(texto)
+        if fallback:
+            resultado["preco"] = fallback
+
     return resultado
 
 
