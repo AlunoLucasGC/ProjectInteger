@@ -95,10 +95,18 @@ def allowed_file(filename: str) -> bool:
 
 
 def buscar_foto_generica(product_name: str) -> str:
+    """Retorna a foto genérica usada atualmente no catálogo."""
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
     slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
     lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
     return PHOTO_SOURCE_URL.format(tags=quote(f"{slug},food"), lock=lock)
+
+
+def _normalizar_nome_busca(nome: str) -> str:
+    """Gera termos úteis para uma busca de foto sem perder o nome original."""
+    nome = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode().lower()
+    nome = re.sub(r"[^a-z0-9\s-]", " ", nome)
+    return re.sub(r"\s+", " ", nome).strip()
 
 
 def melhorar_imagem(caminho: Path):
@@ -158,8 +166,6 @@ def _normalizar_preco(valor: str) -> str:
     if not valor:
         return ""
 
-    # Trata vírgula como separador decimal. Se houver vários pontos,
-    # conserva o último como separador e junta os anteriores.
     if "," in valor:
         valor = valor.replace(".", "").replace(",", ".")
     elif valor.count(".") > 1:
@@ -173,11 +179,9 @@ def _normalizar_preco(valor: str) -> str:
 
 
 def _extrair_preco(texto: str) -> str:
-    """Extrai preço tolerando R$, 20R$ e confusões O/Q por 0 do OCR."""
+    """Extrai preço tolerando formatos comuns e pequenos erros do OCR."""
     padroes = [
-        # Caso normal: PREÇO 20, PREÇO 20.00, PREÇO R$ 20, PREÇO 20R$
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)(?:\s*R\s*\$?)?\b",
-        # OCR pode juntar símbolo/letra diretamente ao número.
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+)[OQ](?:\s*R\s*\$?)?\b",
     ]
     for padrao in padroes:
@@ -212,7 +216,6 @@ def organizar_produto(texto: str) -> dict[str, str]:
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
-
     resultado["preco"] = _extrair_preco(texto)
     return resultado
 
@@ -326,6 +329,8 @@ def publicar_produto():
             imagem=request.form.get("imagem", ""),
         ), 400
 
+    # A função atual gera uma imagem genérica baseada em uma URL externa.
+    # Mantida aqui até substituirmos a fonte por uma busca de imagem mais confiável.
     foto_generica = buscar_foto_generica(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
