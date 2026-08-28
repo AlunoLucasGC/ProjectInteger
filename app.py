@@ -103,12 +103,7 @@ def allowed_file(filename: str) -> bool:
 
 
 def buscar_foto_generica(product_name: str) -> str:
-    """Gera uma URL fixa de foto real do Flickr para o anúncio recém-criado.
-
-    A imagem é carregada pelo navegador como uma imagem comum, não por XHR;
-    portanto CORS não bloqueia sua exibição. O parâmetro ``lock`` mantém a
-    mesma foto para o produto após o cadastro, sem baixar arquivos ao servidor.
-    """
+    """Gera uma URL fixa de foto real do Flickr para o anúncio recém-criado."""
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
     slug = PHOTO_FILE_PATTERN.sub("-", normalized).strip("-")[:60] or "produto-rural"
     lock = hashlib.sha256(slug.encode()).hexdigest()[:12]
@@ -116,17 +111,28 @@ def buscar_foto_generica(product_name: str) -> str:
 
 
 def melhorar_imagem(caminho: Path) -> Path:
-    """Aumenta contraste e tamanho da foto para tornar o OCR mais confiável."""
-    import cv2  # Importação tardia: as páginas sem OCR funcionam sem OpenCV.
+    """Prepara a imagem para OCR usando os bytes do arquivo, evitando falhas do cv2.imread.
 
-    imagem = cv2.imread(str(caminho))
+    A leitura por bytes funciona melhor em ambientes Windows e também evita
+    problemas com caminhos temporários que contenham caracteres especiais.
+    """
+    import cv2
+    import numpy as np
+
+    try:
+        dados = np.frombuffer(caminho.read_bytes(), dtype=np.uint8)
+    except OSError as error:
+        raise ValueError("Não foi possível ler a imagem enviada.") from error
+
+    imagem = cv2.imdecode(dados, cv2.IMREAD_COLOR)
     if imagem is None:
-        raise ValueError("Não foi possível abrir a imagem enviada.")
+        raise ValueError("Não foi possível abrir a imagem enviada. Tente usar JPG, PNG ou WEBP.")
 
     cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
     cinza = cv2.resize(cinza, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
     _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
     tratada = caminho.with_stem(f"{caminho.stem}_tratada")
     if not cv2.imwrite(str(tratada), binaria):
         raise ValueError("Não foi possível preparar a imagem para leitura.")
@@ -144,25 +150,39 @@ def get_ocr_reader():
 
 
 def corrigir_ocr(texto: str) -> str:
-    """Normaliza os erros mais frequentes encontrados nas fichas padronizadas."""
-    texto = texto.upper().replace("T0MATE", "TOMATE")
-    texto = re.sub(r"\bRSK?\b", "R$", texto)
+    """Normaliza erros frequentes encontrados nas fichas padronizadas."""
+    texto = texto.upper()
+    texto = texto.replace("T0MATE", "TOMATE")
+    texto = texto.replace("T0MATO", "TOMATO")
+    texto = re.sub(r"R\s*[S5]\b", "R$", texto)
+    texto = re.sub(r"R\s*\$", "R$", texto)
     return texto.replace(",", ".")
 
 
 def organizar_produto(texto: str) -> dict[str, str]:
-    """Extrai os quatro campos da ficha, tolerando acentos e espaços do OCR."""
+    """Extrai os campos mesmo quando a ficha não possui ':' após os rótulos."""
     resultado = EMPTY_PRODUCT.copy()
-    produto = re.search(r"PRODUTO\s*:\s*([^\n]+)", texto, re.IGNORECASE)
+    texto = corrigir_ocr(texto)
+
+    # Aceita tanto "PRODUTO: tomate" quanto "PRODUTO tomate".
+    produto = re.search(
+        r"PRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
+        texto,
+        re.IGNORECASE | re.DOTALL,
+    )
     quantidade = re.search(
-        r"QUANTIDADE\s*:\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)",
+        r"QUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)",
         texto,
         re.IGNORECASE,
     )
-    preco = re.search(r"PRE(?:Ç|C)O\s*:\s*(?:R\$\s*)?([\d.,]+)", texto, re.IGNORECASE)
+    preco = re.search(
+        r"PRE(?:Ç|C)O\s*:?\s*(?:R\$\s*)?([\d.,]+)\s*R?\$?",
+        texto,
+        re.IGNORECASE,
+    )
 
     if produto:
-        resultado["produto"] = produto.group(1).strip().title()
+        resultado["produto"] = produto.group(1).strip(" :\n\t").title()
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
@@ -175,10 +195,14 @@ def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
     """Executa OCR e devolve os campos encontrados e o texto bruto para auditoria."""
     inicio = perf_counter()
     leitor = get_ocr_reader()
-    textos = leitor.readtext(str(melhorar_imagem(caminho)), detail=0, paragraph=True)
-    texto = "\n".join(textos)
-    app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
-    return organizar_produto(corrigir_ocr(texto)), texto
+    imagem_tratada = melhorar_imagem(caminho)
+    try:
+        textos = leitor.readtext(str(imagem_tratada), detail=0, paragraph=True)
+        texto = "\n".join(textos)
+        app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
+        return organizar_produto(texto), texto
+    finally:
+        imagem_tratada.unlink(missing_ok=True)
 
 
 def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
@@ -211,7 +235,10 @@ def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
 
 
 app = Flask(__name__)
-app.config.update(SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"), MAX_CONTENT_LENGTH=8 * 1024 * 1024)
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"),
+    MAX_CONTENT_LENGTH=8 * 1024 * 1024,
+)
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 init_database()
 
@@ -257,12 +284,12 @@ def executar_ocr():
     imagem.save(caminho)
     try:
         dados, texto = extract_data_from_image(caminho)
-    except (RuntimeError, ValueError) as error:
+    except (RuntimeError, ValueError, OSError) as error:
         flash(str(error), "error")
         return redirect(url_for("cadastro"))
     finally:
         caminho.unlink(missing_ok=True)
-        caminho.with_stem(f"{caminho.stem}_tratada").unlink(missing_ok=True)
+
     return render_template("resultado.html", dados=dados, texto=texto, imagem="")
 
 
@@ -273,7 +300,12 @@ def publicar_produto():
     if errors:
         for error in errors:
             flash(error, "error")
-        return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem=request.form.get("imagem", "")), 400
+        return render_template(
+            "resultado.html",
+            dados=dados,
+            texto=request.form.get("texto", ""),
+            imagem=request.form.get("imagem", ""),
+        ), 400
 
     foto_generica = buscar_foto_generica(dados["produto"])
     with get_connection() as connection:
