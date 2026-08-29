@@ -75,24 +75,6 @@ O diferencial do MVP é o fluxo de cadastro: o produtor envia uma foto de uma fi
 └─────────────────┘
 ```
 
-## 📸 Demonstração
-
-O fluxo principal do sistema pode ser visualizado nas telas abaixo.
-
-### 🏠 Catálogo de produtos
-
-![Catálogo do Feira Fácil](docs/Captura%20de%20tela%202026-08-28%20174758.png)
-
-### 📷 Cadastro por foto com OCR
-
-![Cadastro com OCR](docs/Captura%20de%20tela%202026-08-28%20174804.png)
-
-### ✅ Revisão dos dados antes da publicação
-
-![Revisão do anúncio](docs/Captura%20de%20tela%202026-08-28%20174835.png)
-
-> **Fluxo demonstrado:** o produtor envia a ficha → o OCR identifica os dados → o produtor confere/corrige as informações → o produto é publicado no catálogo.
-
 ## 🏗️ Arquitetura
 
 ```text
@@ -130,7 +112,7 @@ SQLite
 | CSS3 | Interface |
 | Git/GitHub | Versionamento |
 
-As dependências Python estão definidas em [`requirements.txt`](requirements.txt).
+As dependências Python estão definidas em [`requirements.txt`](requirements.txt). citeturn8file0
 
 ## 📂 Estrutura do projeto
 
@@ -142,13 +124,6 @@ ProjectInteger/
 ├── requirements.txt
 ├── ver_banco.py
 ├── .gitignore
-│
-├── docs/
-│   ├── Captura de tela 2026-08-28 174758.png
-│   ├── Captura de tela 2026-08-28 174804.png
-│   ├── Captura de tela 2026-08-28 174835.png
-│   └── screenshots/
-│       └── README.md
 │
 ├── static/
 │   └── estilo.css
@@ -163,6 +138,8 @@ ProjectInteger/
 └── uploads/
 ```
 
+O projeto atualmente separa templates, estilos, lógica da aplicação e esquema do banco em arquivos e diretórios próprios. citeturn6file0turn9file0turn10file0
+
 ## 🗄️ Banco de dados
 
 O projeto utiliza **SQLite** e cria o banco automaticamente ao iniciar a aplicação. O esquema possui entidades para:
@@ -171,9 +148,9 @@ O projeto utiliza **SQLite** e cria o banco automaticamente ao iniciar a aplica�
 - Categorias
 - Produtos
 
-Também existem chaves estrangeiras e índices para relacionamento entre produtos, produtores e categorias.
+Também existem chaves estrangeiras e índices para relacionamento entre produtos, produtores e categorias. citeturn13file0
 
-O arquivo `feira_facil.db` é gerado localmente e não deve ser versionado no Git, conforme o `.gitignore`.
+O arquivo `feira_facil.db` é gerado localmente e não deve ser versionado no Git, conforme o `.gitignore`. citeturn12file0
 
 ## 📋 Formato da ficha
 
@@ -185,7 +162,7 @@ QUANTIDADE: 2 KG
 PREÇO: R$ 8,50
 ```
 
-O sistema também possui tratamento para pequenas variações de formatação, como campos sem `:` e diferentes posições do símbolo `R$`, e apresenta os valores em uma tela de revisão antes de gravá-los no banco.
+O sistema extrai os campos principais e apresenta os valores em uma tela de revisão antes de gravá-los no banco. citeturn18file0
 
 ## ⚙️ Como executar
 
@@ -230,7 +207,7 @@ python app.py
 http://127.0.0.1:5000
 ```
 
-Na primeira utilização do OCR, o EasyOCR pode levar mais tempo para carregar o modelo. O leitor é reutilizado nas próximas leituras para evitar recarregamentos desnecessários.
+Na primeira utilização do OCR, o EasyOCR pode levar mais tempo para carregar o modelo. O leitor é reutilizado nas próximas leituras para evitar recarregamentos desnecessários. citeturn11file0
 
 ## 🔎 Consultando o banco
 
@@ -248,6 +225,8 @@ python ver_banco.py categorias
 python ver_banco.py tabelas
 ```
 
+O script foi criado para facilitar a inspeção do banco sem depender do comando `sqlite3` instalado no sistema. citeturn14file0
+
 ## 🔒 Boas práticas implementadas
 
 - Limite de 8 MB para uploads.
@@ -257,7 +236,7 @@ python ver_banco.py tabelas
 - Exclusão dos arquivos temporários após o OCR.
 - Validação dos dados antes da persistência.
 - Chaves estrangeiras ativadas nas conexões SQLite.
-- `SECRET_KEY` configurável por variável de ambiente para ambientes de produção.
+- `SECRET_KEY` configurável por variável de ambiente para ambientes de produção. citeturn11file0turn13file0
 
 ## 🚧 Status
 

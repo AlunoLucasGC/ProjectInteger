@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import sqlite3
@@ -13,7 +12,6 @@ from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Final
-from urllib.parse import quote
 
 from flask import Flask, flash, redirect, render_template, request, url_for
 from werkzeug.datastructures import FileStorage
@@ -26,9 +24,7 @@ SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
-PHOTO_FILE_PATTERN: Final = re.compile(r"[^a-z0-9]+")
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
-UNSPLASH_SOURCE_URL: Final = "https://source.unsplash.com/featured/640x480/?{query}"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -96,53 +92,68 @@ def allowed_file(filename: str) -> bool:
 
 
 def _normalizar_termo_imagem(product_name: str) -> str:
-    """Prepara uma busca simples em português para uma fonte de imagens."""
     normalized = unicodedata.normalize("NFKD", product_name.lower()).encode("ascii", "ignore").decode()
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-    return normalized
+    return re.sub(r"\s+", " ", normalized).strip()
 
 
 def buscar_foto_produto(product_name: str) -> str | None:
-    """Busca uma foto relacionada ao produto.
-
-    Preferimos a API oficial do Unsplash quando UNSPLASH_ACCESS_KEY estiver
-    configurada. Sem chave, não retornamos uma foto aleatória: o catálogo usa
-    um placeholder neutro para não associar um produto a uma imagem errada.
-    """
+    """Busca foto relevante no Unsplash usando o nome confirmado do produto."""
     termo = _normalizar_termo_imagem(product_name)
-    if not termo:
-        return None
-
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
-    if not access_key:
+    if not termo or not access_key:
         return None
 
     try:
         import requests
     except ImportError:
+        app.logger.error("requests não está instalado. Execute pip install -r requirements.txt.")
         return None
 
-    try:
-        response = requests.get(
-            UNSPLASH_API_URL,
-            params={"query": f"{termo} alimento", "per_page": 1, "orientation": "squarish"},
-            headers={"Authorization": f"Client-ID {access_key}"},
-            timeout=8,
-        )
-        response.raise_for_status()
-        data = response.json()
-        results = data.get("results", [])
-        if not results:
-            return None
-        photo = results[0]
-        return photo.get("urls", {}).get("small") or photo.get("urls", {}).get("regular")
-    except (requests.RequestException, ValueError, KeyError, TypeError):
-        app.logger.exception("Falha ao buscar imagem para produto: %s", product_name)
-        return None
+    consultas = [f"{termo} food", f"{termo} fresh food", termo]
+    for consulta in consultas:
+        try:
+            response = requests.get(
+                UNSPLASH_API_URL,
+                params={"query": consulta, "per_page": 8, "orientation": "squarish"},
+                headers={"Authorization": f"Client-ID {access_key}"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            resultados = response.json().get("results", [])
+        except (requests.RequestException, ValueError, TypeError) as error:
+            app.logger.warning("Falha na busca de imagem %r: %s", consulta, error)
+            continue
+
+        if not resultados:
+            continue
+
+        tokens = {t for t in re.findall(r"[a-z0-9]+", termo) if len(t) > 2}
+        melhor_url = None
+        melhor_pontuacao = -1
+
+        for foto in resultados:
+            descricao = " ".join(
+                str(foto.get(campo) or "") for campo in ("alt_description", "description")
+            ).lower()
+            tags = " ".join(
+                str(tag.get("title") or "")
+                for tag in foto.get("tags", [])
+                if isinstance(tag, dict)
+            ).lower()
+            contexto = f"{descricao} {tags}"
+            pontuacao = sum(token in contexto for token in tokens)
+            url = foto.get("urls", {}).get("small") or foto.get("urls", {}).get("regular")
+            if url and pontuacao > melhor_pontuacao:
+                melhor_pontuacao = pontuacao
+                melhor_url = url
+
+        if melhor_url:
+            return melhor_url
+
+    return None
 
 
 def melhorar_imagem(caminho: Path):
-    """Prepara a imagem para OCR e devolve uma matriz em memória."""
     import cv2
     import numpy as np
 
@@ -150,7 +161,6 @@ def melhorar_imagem(caminho: Path):
         dados = np.frombuffer(caminho.read_bytes(), dtype=np.uint8)
     except OSError as error:
         raise ValueError("Não foi possível ler a imagem enviada.") from error
-
     if dados.size == 0:
         raise ValueError("A imagem enviada está vazia ou inválida.")
 
@@ -175,7 +185,6 @@ def get_ocr_reader():
 
 
 def corrigir_ocr(texto: str) -> str:
-    """Normaliza ruídos comuns do OCR sem destruir acentos ou números."""
     texto = texto.upper()
     texto = texto.replace("T0MATE", "TOMATE")
     texto = texto.replace("T0MATO", "TOMATO")
@@ -185,13 +194,11 @@ def corrigir_ocr(texto: str) -> str:
 
 
 def _limpar_valor(texto: str) -> str:
-    """Remove pontuação solta nas extremidades e normaliza espaços."""
     texto = re.sub(r"\s+", " ", texto)
     return texto.strip(" \t\r\n:;,.-_|/")
 
 
 def _normalizar_preco(valor: str) -> str:
-    """Normaliza um valor monetário sem confundir dígitos válidos."""
     valor = valor.upper().strip()
     valor = re.sub(r"\s*R\s*\$?", "", valor)
     valor = re.sub(r"[^0-9.,]", "", valor)
@@ -209,7 +216,6 @@ def _normalizar_preco(valor: str) -> str:
 
 
 def _extrair_preco(texto: str) -> str:
-    """Extrai preço tolerando R$, 20R$ e confusões O/Q por 0 do OCR."""
     padroes = [
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)(?:\s*R\s*\$?)?\b",
         r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+)[OQ](?:\s*R\s*\$?)?\b",
@@ -226,10 +232,8 @@ def _extrair_preco(texto: str) -> str:
 
 
 def organizar_produto(texto: str) -> dict[str, str]:
-    """Extrai produto, quantidade, unidade e preço em formatos variados."""
     resultado = EMPTY_PRODUCT.copy()
     texto = corrigir_ocr(texto)
-
     produto = re.search(
         r"\bPRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
         texto,
@@ -240,13 +244,11 @@ def organizar_produto(texto: str) -> dict[str, str]:
         texto,
         re.IGNORECASE,
     )
-
     if produto:
         resultado["produto"] = _limpar_valor(produto.group(1)).title()
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
-
     resultado["preco"] = _extrair_preco(texto)
     return resultado
 
@@ -265,7 +267,6 @@ def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
     data = {key: form.get(key, "").strip() for key in (*EMPTY_PRODUCT, "produtor", "contato")}
     data["unidade"] = data["unidade"].upper()
     errors: list[str] = []
-
     if not data["produto"] or len(data["produto"]) > 100:
         errors.append("Informe um nome de produto com até 100 caracteres.")
     if not re.fullmatch(r"\d+(?:[.,]\d+)?", data["quantidade"]):
@@ -343,7 +344,6 @@ def executar_ocr():
         return redirect(url_for("cadastro"))
     finally:
         caminho.unlink(missing_ok=True)
-
     return render_template("resultado.html", dados=dados, texto=texto, imagem="")
 
 
