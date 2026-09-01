@@ -36,10 +36,11 @@
 
         <section class="product-description">
           <h2>Sobre o produto</h2>
-          <p>
-            {{ produto.nome }} é um produto comercializado diretamente por {{ produto.produtor }}.
-            Consulte pelo WhatsApp informações sobre disponibilidade, qualidade, forma de entrega ou retirada e outras características do produto.
-          </p>
+          {% if produto.descricao %}
+            <p>{{ produto.descricao }}</p>
+          {% else %}
+            <p>O produtor ainda não adicionou uma descrição para este produto.</p>
+          {% endif %}
         </section>
 
         {% if produto.contato %}

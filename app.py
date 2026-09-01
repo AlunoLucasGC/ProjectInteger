@@ -26,7 +26,7 @@ DATABASE: Final = BASE_DIR / "feira_facil.db"
 SCHEMA_FILE: Final = BASE_DIR / "database.sql"
 ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
-EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
+EMPTY_PRODUCT: Final = {"produto": "", "descricao": "", "quantidade": "", "unidade": "", "preco": ""}
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
 PHOTO_TRANSLATIONS: Final = {
     "tomate": "tomato", "tomates": "tomato", "banana": "banana", "bananas": "banana",
@@ -77,8 +77,8 @@ def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
         else:
             producer_id = producer["id_produtor"]
         connection.execute(
-            "INSERT INTO tb_produtos (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (producer_id, category_id, product["nome"], product["quantidade"], product["unidade"], product["preco"], product["imagem"], product["criado_em"]),
+            "INSERT INTO tb_produtos (id_produtor, id_categoria, nome, descricao, quantidade, unidade, preco, foto_produto, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (producer_id, category_id, product["nome"], None, product["quantidade"], product["unidade"], product["preco"], product["imagem"], product["criado_em"]),
         )
 
 
@@ -138,7 +138,6 @@ def buscar_foto_produto(product_name: str) -> str | None:
             contexto = f"{alt} {descricao} {tags}"
             tokens_contexto = _tokens(contexto)
             pontuacao = len(tokens_produto & tokens_contexto) * 20
-
             for traducao in traducoes:
                 if _tokens(traducao) & tokens_contexto:
                     pontuacao += 30
@@ -271,6 +270,8 @@ def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
     errors: list[str] = []
     if not data["produto"] or len(data["produto"]) > 100:
         errors.append("Informe um nome de produto com até 100 caracteres.")
+    if len(data["descricao"]) > 500:
+        errors.append("A descrição deve ter até 500 caracteres.")
     if not re.fullmatch(r"\d+(?:[.,]\d+)?", data["quantidade"]):
         errors.append("Informe uma quantidade numérica maior que zero.")
     elif Decimal(data["quantidade"].replace(",", ".")) <= 0:
@@ -303,15 +304,7 @@ def pagina_inicial():
     busca = request.args.get("q", "").strip()
     with get_connection() as connection:
         produtos = connection.execute(
-            """
-            SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
-                   printf('%.2f', p.preco) AS preco, pr.nome AS produtor,
-                   pr.telefone AS contato, p.foto_produto AS imagem
-            FROM tb_produtos AS p
-            JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor
-            WHERE p.disponivel = 1 AND (p.nome LIKE ? OR pr.nome LIKE ?)
-            ORDER BY p.id_produto DESC
-            """,
+            "SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade, printf('%.2f', p.preco) AS preco, p.descricao, pr.nome AS produtor, pr.telefone AS contato, p.foto_produto AS imagem FROM tb_produtos AS p JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor WHERE p.disponivel = 1 AND (p.nome LIKE ? OR pr.nome LIKE ?) ORDER BY p.id_produto DESC",
             (f"%{busca}%", f"%{busca}%"),
         ).fetchall()
     return render_template("index.html", produtos=produtos, busca=busca)
@@ -319,17 +312,9 @@ def pagina_inicial():
 
 @app.get("/produto/<int:product_id>")
 def detalhes_produto(product_id: int):
-    """Exibe os detalhes de um anúncio específico."""
     with get_connection() as connection:
         produto = connection.execute(
-            """
-            SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
-                   printf('%.2f', p.preco) AS preco, p.foto_produto AS imagem,
-                   pr.nome AS produtor, pr.telefone AS contato
-            FROM tb_produtos AS p
-            JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor
-            WHERE p.id_produto = ? AND p.disponivel = 1
-            """,
+            "SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade, printf('%.2f', p.preco) AS preco, p.descricao, p.foto_produto AS imagem, pr.nome AS produtor, pr.telefone AS contato FROM tb_produtos AS p JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor WHERE p.id_produto = ? AND p.disponivel = 1",
             (product_id,),
         ).fetchone()
     if produto is None:
@@ -382,12 +367,8 @@ def publicar_produto():
         else:
             producer_id = producer["id_produtor"]
         connection.execute(
-            """
-            INSERT INTO tb_produtos
-                (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, foto_ficha)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (producer_id, category_id, dados["produto"], dados["quantidade"], dados["unidade"], dados["preco"], foto_produto, None),
+            "INSERT INTO tb_produtos (id_produtor, id_categoria, nome, descricao, quantidade, unidade, preco, foto_produto, foto_ficha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (producer_id, category_id, dados["produto"], dados["descricao"], dados["quantidade"], dados["unidade"], dados["preco"], foto_produto, None),
         )
     flash("Produto publicado e disponível para consumidores!", "success")
     return redirect(url_for("pagina_inicial"))

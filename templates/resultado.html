@@ -12,11 +12,10 @@
     <section class="form-card">
       <p class="eyebrow">ETAPA FINAL</p>
       <h1>Revise seu anúncio</h1>
-      <p>O OCR pode errar. Ajuste os dados abaixo antes de publicar. Ao publicar, o catálogo buscará uma foto genérica do produto.</p>
+      <p>O OCR pode errar. Ajuste os dados abaixo antes de publicar.</p>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
       {% endwith %}
-      <!-- Os campos ficam editáveis para que o produtor corrija qualquer leitura do OCR. -->
       <form action="{{ url_for('publicar_produto') }}" method="post">
         <input type="hidden" name="texto" value="{{ texto }}">
         <label for="produto">Produto</label>
@@ -27,6 +26,9 @@
         </div>
         <label for="preco">Preço (R$)</label>
         <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
+        <label for="descricao">Descrição do produto</label>
+        <textarea id="descricao" name="descricao" rows="4" maxlength="500" placeholder="Ex.: Tomates frescos, colhidos no dia e cultivados na propriedade.">{{ dados.descricao|default('') }}</textarea>
+        <small>Conte um pouco sobre o produto para ajudar o consumidor a conhecê-lo.</small>
         <label for="produtor">Nome do produtor</label>
         <input id="produtor" name="produtor" value="{{ dados.produtor|default('') }}" maxlength="100" required>
         <label for="contato">Telefone ou WhatsApp</label>
