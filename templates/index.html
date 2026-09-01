@@ -10,13 +10,21 @@
   <header class="site-header"><a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a><a class="producer-link" href="{{ url_for('cadastro') }}">Sou produtor</a></header>
   <main class="catalog">
     <section class="hero"><p class="eyebrow">DO CAMPO PARA A SUA MESA</p><h1>Produtos frescos, de quem produz perto de você.</h1><p>Encontre produtores locais e combine a compra diretamente com eles.</p></section>
-    <!-- A busca é feita no servidor para funcionar também sem JavaScript. -->
     <form class="search" action="{{ url_for('pagina_inicial') }}" method="get"><label class="sr-only" for="q">Buscar produtos ou produtores</label><input id="q" name="q" value="{{ busca }}" placeholder="Buscar produtos ou produtores"><button type="submit">Buscar</button></form>
     {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}{% endwith %}
     <section aria-labelledby="titulo-produtos"><div class="section-heading"><h2 id="titulo-produtos">Produtos disponíveis</h2><span>{{ produtos|length }} encontrado{{ '' if produtos|length == 1 else 's' }}</span></div>
       {% if produtos %}<div class="product-grid">{% for produto in produtos %}<article class="product-card">
-        {% if produto.imagem %}<img src="{{ produto.imagem if produto.imagem.startswith('http') else url_for('upload', nome=produto.imagem) }}" alt="Foto genérica de {{ produto.nome }}" loading="lazy">{% else %}<div class="image-placeholder" aria-hidden="true">🌿</div>{% endif %}
-        <div class="product-body"><p class="producer">{{ produto.produtor }}</p><h3>{{ produto.nome }}</h3><p>{{ produto.quantidade }} {{ produto.unidade }}</p><strong>R$ {{ produto.preco }}</strong><a class="contact" href="tel:{{ produto.contato|replace(' ', '')|replace('(', '')|replace('-', '') }}">Falar com produtor</a><form action="{{ url_for('excluir_produto', product_id=produto.id) }}" method="post" onsubmit="return confirm('Excluir este anúncio do catálogo?');"><button class="delete-product" type="submit">Excluir anúncio</button></form></div>
+        {% if produto.imagem %}<img src="{{ produto.imagem if produto.imagem.startswith('http') else url_for('upload', nome=produto.imagem) }}" alt="Foto de {{ produto.nome }}" loading="lazy">{% else %}<div class="image-placeholder" aria-hidden="true">🌿</div>{% endif %}
+        <div class="product-body"><p class="producer">{{ produto.produtor }}</p><h3>{{ produto.nome }}</h3><p>{{ produto.quantidade }} {{ produto.unidade }}</p><strong>R$ {{ produto.preco }}</strong>
+          {% set telefone = produto.contato|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '')|replace('+', '') %}
+          {% if telefone %}
+            <a class="contact" href="https://wa.me/{{ telefone }}?text={{ ('Olá! Encontrei seu anúncio de ' ~ produto.nome ~ ' no Feira Fácil e gostaria de saber mais sobre o produto.')|urlencode }}" target="_blank" rel="noopener noreferrer">💬 Falar no WhatsApp</a>
+            <a class="contact-secondary" href="tel:{{ telefone }}">📞 Ligar para o produtor</a>
+          {% else %}
+            <span class="contact-disabled">Contato indisponível</span>
+          {% endif %}
+          <form action="{{ url_for('excluir_produto', product_id=produto.id) }}" method="post" onsubmit="return confirm('Excluir este anúncio do catálogo?');"><button class="delete-product" type="submit">Excluir anúncio</button></form>
+        </div>
       </article>{% endfor %}</div>{% else %}<div class="empty-state"><h3>Nenhum produto encontrado.</h3><p>{% if busca %}Tente outro termo de busca.{% else %}Seja o primeiro produtor a publicar uma oferta.{% endif %}</p><a class="producer-link" href="{{ url_for('cadastro') }}">Cadastrar produto</a></div>{% endif %}
     </section>
   </main>
