@@ -27,7 +27,7 @@ body {
 
 a { color: inherit; }
 button, input, select { font: inherit; }
-button, .producer-link, .contact { -webkit-tap-highlight-color: transparent; }
+button, .producer-link, .contact, .contact-secondary { -webkit-tap-highlight-color: transparent; }
 
 :focus-visible {
     outline: 3px solid #efb239;
@@ -58,7 +58,7 @@ button, .producer-link, .contact { -webkit-tap-highlight-color: transparent; }
     white-space: nowrap;
 }
 
-.producer-link, button, .contact {
+.producer-link, button, .contact, .contact-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -75,7 +75,7 @@ button, .producer-link, .contact { -webkit-tap-highlight-color: transparent; }
     color: #fff;
 }
 .producer-link:hover { background: #0f3325; }
-.producer-link:active, button:active, .contact:active { transform: translateY(1px); }
+.producer-link:active, button:active, .contact:active, .contact-secondary:active { transform: translateY(1px); }
 
 .catalog, .form-page {
     width: min(1180px, calc(100% - 40px));
@@ -148,8 +148,27 @@ button, .producer-link, .contact { -webkit-tap-highlight-color: transparent; }
 .product-body .producer { color: var(--verde); font-size: .85rem; font-weight: 750; }
 .product-body h3 { font-size: 1.1rem; letter-spacing: -.02em; }
 .product-body strong { color: var(--verde-escuro); font-size: 1.15rem; }
-.contact { margin-top: 8px; border: 1px solid var(--verde); color: var(--verde-escuro); }
+.contact {
+    margin-top: 8px;
+    min-height: 46px;
+    border: 1px solid var(--verde);
+    background: #fff;
+    color: var(--verde-escuro);
+}
 .contact:hover { background: var(--verde-claro); }
+.contact-secondary {
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--borda);
+    background: #f8faf7;
+    color: var(--texto-suave);
+    font-size: .9rem;
+}
+.contact-secondary:hover {
+    background: #eef3ed;
+    border-color: #b8c8bb;
+    color: var(--verde-escuro);
+}
 .product-body form { margin-top: 4px; }
 .delete-product { width: 100%; min-height: 38px; border: 1px solid var(--erro); border-radius: 10px; background: #fff; color: var(--erro); cursor: pointer; font-size: .85rem; }
 .delete-product:hover { background: #fce9e8; }
@@ -190,7 +209,7 @@ details p { margin-bottom: 0; }
     .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .product-body { padding: 14px; }
     .product-body h3 { font-size: 1rem; }
-    .contact { font-size: .83rem; }
+    .contact, .contact-secondary { font-size: .83rem; }
 }
 
 @media (max-width: 400px) {
