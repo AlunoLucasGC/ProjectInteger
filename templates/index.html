@@ -19,7 +19,6 @@
           {% set telefone = produto.contato|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '')|replace('+', '') %}
           {% if telefone %}
             <a class="contact" href="https://wa.me/{{ telefone }}?text={{ ('Olá! Encontrei seu anúncio de ' ~ produto.nome ~ ' no Feira Fácil e gostaria de saber mais sobre o produto.')|urlencode }}" target="_blank" rel="noopener noreferrer">💬 Falar no WhatsApp</a>
-            <a class="contact-secondary" href="tel:{{ telefone }}">📞 Ligar para o produtor</a>
           {% else %}
             <span class="contact-disabled">Contato indisponível</span>
           {% endif %}
