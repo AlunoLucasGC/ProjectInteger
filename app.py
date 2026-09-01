@@ -30,6 +30,53 @@ UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
 
+# Traduções de produtos comuns para melhorar a busca no Unsplash.
+PHOTO_TRANSLATIONS: Final = {
+    "tomate": "tomato",
+    "tomates": "tomato",
+    "banana": "banana",
+    "bananas": "banana",
+    "melancia": "watermelon",
+    "melancias": "watermelon",
+    "morango": "strawberry",
+    "morangos": "strawberry",
+    "batata": "potato",
+    "batatas": "potato",
+    "cenoura": "carrot",
+    "cenouras": "carrot",
+    "cebola": "onion",
+    "cebolas": "onion",
+    "alface": "lettuce",
+    "alfaces": "lettuce",
+    "pepino": "cucumber",
+    "pepinos": "cucumber",
+    "abacaxi": "pineapple",
+    "abacaxis": "pineapple",
+    "maca": "apple",
+    "macas": "apple",
+    "laranja": "orange",
+    "laranjas": "orange",
+    "limao": "lemon",
+    "limoes": "lemon",
+    "uva": "grape",
+    "uvas": "grape",
+    "mamao": "papaya",
+    "mamaos": "papaya",
+    "manga": "mango",
+    "mangas": "mango",
+    "pimentao": "bell pepper",
+    "pimentoes": "bell pepper",
+}
+
+# Termos que indicam uma composição que pode tirar o foco do produto.
+NEGATIVE_TERMS: Final = {
+    "banana": {"coffee", "cafe", "espresso", "latte", "cup", "breakfast", "cake", "bread", "smoothie"},
+    "tomate": {"pizza", "sauce", "salad", "burger", "hamburger", "sandwich"},
+    "maca": {"pie", "cake", "juice", "salad", "dessert"},
+    "laranja": {"juice", "cocktail", "drink", "cake"},
+    "batata": {"fries", "french", "burger", "hamburger", "chips"},
+}
+
 
 def get_connection() -> sqlite3.Connection:
     connection = sqlite3.connect(DATABASE)
@@ -100,11 +147,16 @@ def _normalizar_termo_imagem(product_name: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+def _tokens(texto: str) -> set[str]:
+    return {token for token in re.findall(r"[a-z0-9]+", _normalizar_termo_imagem(texto)) if len(token) >= 3}
+
+
 def buscar_foto_produto(product_name: str) -> str | None:
-    """Busca foto relevante no Unsplash usando o nome confirmado do produto."""
+    """Busca uma imagem do próprio produto, evitando composições genéricas."""
     termo = _normalizar_termo_imagem(product_name)
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
     if not termo or not access_key:
+        app.logger.warning("Não foi possível buscar imagem: produto ou chave ausente.")
         return None
 
     try:
@@ -113,14 +165,32 @@ def buscar_foto_produto(product_name: str) -> str | None:
         app.logger.error("requests não está instalado. Execute pip install -r requirements.txt.")
         return None
 
-    consultas = [f"{termo} food", f"{termo} fresh food", termo]
+    # Busca primeiro pelo termo exato e depois por traduções/contextos mais específicos.
+    tokens_produto = _tokens(termo)
+    traducoes = [PHOTO_TRANSLATIONS[token] for token in tokens_produto if token in PHOTO_TRANSLATIONS]
+    consultas = [
+        f'"{termo}" isolated',
+        f'"{termo}" fresh',
+        termo,
+    ]
+    consultas.extend(f'"{traducao}" isolated' for traducao in traducoes)
+    consultas.extend(f'"{traducao}" fresh' for traducao in traducoes)
+
+    melhor_url: str | None = None
+    melhor_pontuacao = -999
+
     for consulta in consultas:
         try:
             response = requests.get(
                 UNSPLASH_API_URL,
-                params={"query": consulta, "per_page": 8, "orientation": "squarish"},
+                params={
+                    "query": consulta,
+                    "per_page": 30,
+                    "orientation": "squarish",
+                    "content_filter": "high",
+                },
                 headers={"Authorization": f"Client-ID {access_key}"},
-                timeout=8,
+                timeout=10,
             )
             response.raise_for_status()
             resultados = response.json().get("results", [])
@@ -128,32 +198,71 @@ def buscar_foto_produto(product_name: str) -> str | None:
             app.logger.warning("Falha na busca de imagem %r: %s", consulta, error)
             continue
 
-        if not resultados:
-            continue
-
-        tokens = {t for t in re.findall(r"[a-z0-9]+", termo) if len(t) > 2}
-        melhor_url = None
-        melhor_pontuacao = -1
-
         for foto in resultados:
-            descricao = " ".join(
-                str(foto.get(campo) or "") for campo in ("alt_description", "description")
-            ).lower()
+            alt = str(foto.get("alt_description") or "")
+            descricao = str(foto.get("description") or "")
             tags = " ".join(
                 str(tag.get("title") or "")
                 for tag in foto.get("tags", [])
                 if isinstance(tag, dict)
-            ).lower()
-            contexto = f"{descricao} {tags}"
-            pontuacao = sum(token in contexto for token in tokens)
-            url = foto.get("urls", {}).get("small") or foto.get("urls", {}).get("regular")
-            if url and pontuacao > melhor_pontuacao:
+            )
+            contexto = f"{alt} {descricao} {tags}"
+            tokens_contexto = _tokens(contexto)
+
+            pontuacao = 0
+
+            # Correspondência forte com o produto.
+            correspondencias = tokens_produto & tokens_contexto
+            pontuacao += len(correspondencias) * 20
+
+            # Traduções recebem peso alto quando aparecem nas tags/descrições.
+            for traducao in traducoes:
+                if _tokens(traducao) & tokens_contexto:
+                    pontuacao += 30
+
+            # O produto aparecendo claramente na descrição é melhor que uma tag genérica.
+            if termo in _normalizar_termo_imagem(f"{alt} {descricao}"):
+                pontuacao += 25
+
+            # Busca por "isolated" é preferida porque tende a retornar o produto sozinho.
+            if "isolated" in tokens_contexto:
+                pontuacao += 20
+
+            if "fresh" in tokens_contexto:
+                pontuacao += 5
+
+            # Penaliza composições com outros objetos/conteúdos.
+            negativos = NEGATIVE_TERMS.get(termo, set())
+            for negativo in negativos:
+                if negativo in tokens_contexto or negativo in contexto:
+                    pontuacao -= 35
+
+            # Penaliza ausência total de evidência textual.
+            if not alt and not descricao and not tags:
+                pontuacao -= 15
+
+            url = (foto.get("urls") or {}).get("regular")
+            if not url:
+                continue
+
+            if pontuacao > melhor_pontuacao:
                 melhor_pontuacao = pontuacao
                 melhor_url = url
 
-        if melhor_url:
-            return melhor_url
+    # Só salva quando há evidência suficiente de que a imagem representa o produto.
+    if melhor_url and melhor_pontuacao >= 20:
+        app.logger.info(
+            "Imagem escolhida para '%s' com pontuação %s.",
+            product_name,
+            melhor_pontuacao,
+        )
+        return melhor_url
 
+    app.logger.warning(
+        "Nenhuma imagem suficientemente precisa encontrada para '%s'. Pontuação máxima: %s",
+        product_name,
+        melhor_pontuacao,
+    )
     return None
 
 
