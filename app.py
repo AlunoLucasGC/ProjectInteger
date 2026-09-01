@@ -13,9 +13,13 @@ from pathlib import Path
 from time import perf_counter
 from typing import Final
 
+from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+
+# Carrega as variáveis do arquivo .env quando ele existir.
+load_dotenv()
 
 BASE_DIR: Final = Path(__file__).resolve().parent
 UPLOAD_FOLDER: Final = BASE_DIR / "uploads"
