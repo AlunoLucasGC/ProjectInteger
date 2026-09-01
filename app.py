@@ -18,7 +18,6 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-# Carrega as variáveis do arquivo .env quando ele existir.
 load_dotenv()
 
 BASE_DIR: Final = Path(__file__).resolve().parent
@@ -29,46 +28,17 @@ ALLOWED_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "quantidade": "", "unidade": "", "preco": ""}
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
-
-# Traduções de produtos comuns para melhorar a busca no Unsplash.
 PHOTO_TRANSLATIONS: Final = {
-    "tomate": "tomato",
-    "tomates": "tomato",
-    "banana": "banana",
-    "bananas": "banana",
-    "melancia": "watermelon",
-    "melancias": "watermelon",
-    "morango": "strawberry",
-    "morangos": "strawberry",
-    "batata": "potato",
-    "batatas": "potato",
-    "cenoura": "carrot",
-    "cenouras": "carrot",
-    "cebola": "onion",
-    "cebolas": "onion",
-    "alface": "lettuce",
-    "alfaces": "lettuce",
-    "pepino": "cucumber",
-    "pepinos": "cucumber",
-    "abacaxi": "pineapple",
-    "abacaxis": "pineapple",
-    "maca": "apple",
-    "macas": "apple",
-    "laranja": "orange",
-    "laranjas": "orange",
-    "limao": "lemon",
-    "limoes": "lemon",
-    "uva": "grape",
-    "uvas": "grape",
-    "mamao": "papaya",
-    "mamaos": "papaya",
-    "manga": "mango",
-    "mangas": "mango",
-    "pimentao": "bell pepper",
-    "pimentoes": "bell pepper",
+    "tomate": "tomato", "tomates": "tomato", "banana": "banana", "bananas": "banana",
+    "melancia": "watermelon", "melancias": "watermelon", "morango": "strawberry", "morangos": "strawberry",
+    "batata": "potato", "batatas": "potato", "cenoura": "carrot", "cenouras": "carrot",
+    "cebola": "onion", "cebolas": "onion", "alface": "lettuce", "alfaces": "lettuce",
+    "pepino": "cucumber", "pepinos": "cucumber", "abacaxi": "pineapple", "abacaxis": "pineapple",
+    "maca": "apple", "macas": "apple", "laranja": "orange", "laranjas": "orange",
+    "limao": "lemon", "limoes": "lemon", "uva": "grape", "uvas": "grape",
+    "mamao": "papaya", "mamaos": "papaya", "manga": "mango", "mangas": "mango",
+    "pimentao": "bell pepper", "pimentoes": "bell pepper",
 }
-
-# Termos que indicam uma composição que pode tirar o foco do produto.
 NEGATIVE_TERMS: Final = {
     "banana": {"coffee", "cafe", "espresso", "latte", "cup", "breakfast", "cake", "bread", "smoothie"},
     "tomate": {"pizza", "sauce", "salad", "burger", "hamburger", "sandwich"},
@@ -89,52 +59,26 @@ def init_database() -> None:
     with get_connection() as connection:
         connection.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
         connection.execute("INSERT OR IGNORE INTO tb_categorias (nome) VALUES (?)", ("Sem categoria",))
-        legacy_table = connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'produtos'"
-        ).fetchone()
+        legacy_table = connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'produtos'").fetchone()
         connection.execute("CREATE TABLE IF NOT EXISTS migracoes (nome TEXT PRIMARY KEY)")
-        migration_done = connection.execute(
-            "SELECT 1 FROM migracoes WHERE nome = ?", ("produtos_para_tb_produtos",)
-        ).fetchone()
+        migration_done = connection.execute("SELECT 1 FROM migracoes WHERE nome = ?", ("produtos_para_tb_produtos",)).fetchone()
         if legacy_table and migration_done is None:
             _migrate_legacy_products(connection)
         connection.execute("INSERT OR IGNORE INTO migracoes (nome) VALUES (?)", ("produtos_para_tb_produtos",))
 
 
 def _migrate_legacy_products(connection: sqlite3.Connection) -> None:
-    category_id = connection.execute(
-        "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
-    ).fetchone()["id_categoria"]
+    category_id = connection.execute("SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)).fetchone()["id_categoria"]
     legacy_products = connection.execute("SELECT * FROM produtos ORDER BY id").fetchall()
     for product in legacy_products:
-        producer = connection.execute(
-            "SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?",
-            (product["produtor"], product["contato"]),
-        ).fetchone()
+        producer = connection.execute("SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?", (product["produtor"], product["contato"])).fetchone()
         if producer is None:
-            cursor = connection.execute(
-                "INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)",
-                (product["produtor"], product["contato"]),
-            )
-            producer_id = cursor.lastrowid
+            producer_id = connection.execute("INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)", (product["produtor"], product["contato"])).lastrowid
         else:
             producer_id = producer["id_produtor"]
         connection.execute(
-            """
-            INSERT INTO tb_produtos
-                (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, data_cadastro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                producer_id,
-                category_id,
-                product["nome"],
-                product["quantidade"],
-                product["unidade"],
-                product["preco"],
-                product["imagem"],
-                product["criado_em"],
-            ),
+            "INSERT INTO tb_produtos (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (producer_id, category_id, product["nome"], product["quantidade"], product["unidade"], product["preco"], product["imagem"], product["criado_em"]),
         )
 
 
@@ -152,27 +96,21 @@ def _tokens(texto: str) -> set[str]:
 
 
 def buscar_foto_produto(product_name: str) -> str | None:
-    """Busca uma imagem do próprio produto, evitando composições genéricas."""
+    """Busca uma imagem do próprio produto e rejeita composições pouco relevantes."""
     termo = _normalizar_termo_imagem(product_name)
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
     if not termo or not access_key:
-        app.logger.warning("Não foi possível buscar imagem: produto ou chave ausente.")
+        app.logger.warning("Busca de imagem indisponível: produto ou chave ausente.")
         return None
-
     try:
         import requests
     except ImportError:
         app.logger.error("requests não está instalado. Execute pip install -r requirements.txt.")
         return None
 
-    # Busca primeiro pelo termo exato e depois por traduções/contextos mais específicos.
     tokens_produto = _tokens(termo)
     traducoes = [PHOTO_TRANSLATIONS[token] for token in tokens_produto if token in PHOTO_TRANSLATIONS]
-    consultas = [
-        f'"{termo}" isolated',
-        f'"{termo}" fresh',
-        termo,
-    ]
+    consultas = [f'"{termo}" isolated', f'"{termo}" fresh', termo]
     consultas.extend(f'"{traducao}" isolated' for traducao in traducoes)
     consultas.extend(f'"{traducao}" fresh' for traducao in traducoes)
 
@@ -183,12 +121,7 @@ def buscar_foto_produto(product_name: str) -> str | None:
         try:
             response = requests.get(
                 UNSPLASH_API_URL,
-                params={
-                    "query": consulta,
-                    "per_page": 30,
-                    "orientation": "squarish",
-                    "content_filter": "high",
-                },
+                params={"query": consulta, "per_page": 30, "orientation": "squarish", "content_filter": "high"},
                 headers={"Authorization": f"Client-ID {access_key}"},
                 timeout=10,
             )
@@ -201,86 +134,51 @@ def buscar_foto_produto(product_name: str) -> str | None:
         for foto in resultados:
             alt = str(foto.get("alt_description") or "")
             descricao = str(foto.get("description") or "")
-            tags = " ".join(
-                str(tag.get("title") or "")
-                for tag in foto.get("tags", [])
-                if isinstance(tag, dict)
-            )
+            tags = " ".join(str(tag.get("title") or "") for tag in foto.get("tags", []) if isinstance(tag, dict))
             contexto = f"{alt} {descricao} {tags}"
             tokens_contexto = _tokens(contexto)
+            pontuacao = len(tokens_produto & tokens_contexto) * 20
 
-            pontuacao = 0
-
-            # Correspondência forte com o produto.
-            correspondencias = tokens_produto & tokens_contexto
-            pontuacao += len(correspondencias) * 20
-
-            # Traduções recebem peso alto quando aparecem nas tags/descrições.
             for traducao in traducoes:
                 if _tokens(traducao) & tokens_contexto:
                     pontuacao += 30
-
-            # O produto aparecendo claramente na descrição é melhor que uma tag genérica.
             if termo in _normalizar_termo_imagem(f"{alt} {descricao}"):
                 pontuacao += 25
-
-            # Busca por "isolated" é preferida porque tende a retornar o produto sozinho.
             if "isolated" in tokens_contexto:
                 pontuacao += 20
-
             if "fresh" in tokens_contexto:
                 pontuacao += 5
-
-            # Penaliza composições com outros objetos/conteúdos.
-            negativos = NEGATIVE_TERMS.get(termo, set())
-            for negativo in negativos:
+            for negativo in NEGATIVE_TERMS.get(termo, set()):
                 if negativo in tokens_contexto or negativo in contexto:
                     pontuacao -= 35
-
-            # Penaliza ausência total de evidência textual.
             if not alt and not descricao and not tags:
                 pontuacao -= 15
 
             url = (foto.get("urls") or {}).get("regular")
-            if not url:
-                continue
-
-            if pontuacao > melhor_pontuacao:
+            if url and pontuacao > melhor_pontuacao:
                 melhor_pontuacao = pontuacao
                 melhor_url = url
 
-    # Só salva quando há evidência suficiente de que a imagem representa o produto.
     if melhor_url and melhor_pontuacao >= 20:
-        app.logger.info(
-            "Imagem escolhida para '%s' com pontuação %s.",
-            product_name,
-            melhor_pontuacao,
-        )
+        app.logger.info("Imagem escolhida para '%s' com pontuação %s.", product_name, melhor_pontuacao)
         return melhor_url
 
-    app.logger.warning(
-        "Nenhuma imagem suficientemente precisa encontrada para '%s'. Pontuação máxima: %s",
-        product_name,
-        melhor_pontuacao,
-    )
+    app.logger.warning("Nenhuma imagem suficientemente precisa encontrada para '%s'. Pontuação máxima: %s", product_name, melhor_pontuacao)
     return None
 
 
 def melhorar_imagem(caminho: Path):
     import cv2
     import numpy as np
-
     try:
         dados = np.frombuffer(caminho.read_bytes(), dtype=np.uint8)
     except OSError as error:
         raise ValueError("Não foi possível ler a imagem enviada.") from error
     if dados.size == 0:
         raise ValueError("A imagem enviada está vazia ou inválida.")
-
     imagem = cv2.imdecode(dados, cv2.IMREAD_COLOR)
     if imagem is None:
         raise ValueError("Não foi possível abrir a imagem enviada. Tente usar JPG, PNG ou WEBP.")
-
     cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
     cinza = cv2.resize(cinza, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
@@ -299,8 +197,7 @@ def get_ocr_reader():
 
 def corrigir_ocr(texto: str) -> str:
     texto = texto.upper()
-    texto = texto.replace("T0MATE", "TOMATE")
-    texto = texto.replace("T0MATO", "TOMATO")
+    texto = texto.replace("T0MATE", "TOMATE").replace("T0MATO", "TOMATO")
     texto = re.sub(r"R\s*[S5]\b", "R$", texto)
     texto = re.sub(r"R\s*\$", "R$", texto)
     return texto.replace(",", ".")
@@ -347,16 +244,8 @@ def _extrair_preco(texto: str) -> str:
 def organizar_produto(texto: str) -> dict[str, str]:
     resultado = EMPTY_PRODUCT.copy()
     texto = corrigir_ocr(texto)
-    produto = re.search(
-        r"\bPRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
-        texto,
-        re.IGNORECASE | re.DOTALL,
-    )
-    quantidade = re.search(
-        r"\bQUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
-        texto,
-        re.IGNORECASE,
-    )
+    produto = re.search(r"\bPRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)", texto, re.IGNORECASE | re.DOTALL)
+    quantidade = re.search(r"\bQUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b", texto, re.IGNORECASE)
     if produto:
         resultado["produto"] = _limpar_valor(produto.group(1)).title()
     if quantidade:
@@ -404,10 +293,7 @@ def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
 
 
 app = Flask(__name__)
-app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"),
-    MAX_CONTENT_LENGTH=8 * 1024 * 1024,
-)
+app.config.update(SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"), MAX_CONTENT_LENGTH=8 * 1024 * 1024)
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 init_database()
 
@@ -431,6 +317,27 @@ def pagina_inicial():
     return render_template("index.html", produtos=produtos, busca=busca)
 
 
+@app.get("/produto/<int:product_id>")
+def detalhes_produto(product_id: int):
+    """Exibe os detalhes de um anúncio específico."""
+    with get_connection() as connection:
+        produto = connection.execute(
+            """
+            SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
+                   printf('%.2f', p.preco) AS preco, p.foto_produto AS imagem,
+                   pr.nome AS produtor, pr.telefone AS contato
+            FROM tb_produtos AS p
+            JOIN tb_produtores AS pr ON pr.id_produtor = p.id_produtor
+            WHERE p.id_produto = ? AND p.disponivel = 1
+            """,
+            (product_id,),
+        ).fetchone()
+    if produto is None:
+        flash("Produto não encontrado.", "error")
+        return redirect(url_for("pagina_inicial"))
+    return render_template("produto.html", produto=produto)
+
+
 @app.get("/cadastro")
 def cadastro():
     return render_template("cadastro.html")
@@ -445,7 +352,6 @@ def executar_ocr():
     if not allowed_file(imagem.filename):
         flash("Envie uma imagem JPG, JPEG, PNG ou WEBP.", "error")
         return redirect(url_for("cadastro"))
-
     nome = secure_filename(imagem.filename)
     caminho = UPLOAD_FOLDER / f"{uuid.uuid4().hex}_{nome}"
     imagem.save(caminho)
@@ -466,27 +372,13 @@ def publicar_produto():
     if errors:
         for error in errors:
             flash(error, "error")
-        return render_template(
-            "resultado.html",
-            dados=dados,
-            texto=request.form.get("texto", ""),
-            imagem=request.form.get("imagem", ""),
-        ), 400
-
+        return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem=request.form.get("imagem", "")), 400
     foto_produto = buscar_foto_produto(dados["produto"])
     with get_connection() as connection:
-        category_id = connection.execute(
-            "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
-        ).fetchone()["id_categoria"]
-        producer = connection.execute(
-            "SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?",
-            (dados["produtor"], dados["contato"]),
-        ).fetchone()
+        category_id = connection.execute("SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)).fetchone()["id_categoria"]
+        producer = connection.execute("SELECT id_produtor FROM tb_produtores WHERE nome = ? AND telefone = ?", (dados["produtor"], dados["contato"])).fetchone()
         if producer is None:
-            producer_id = connection.execute(
-                "INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)",
-                (dados["produtor"], dados["contato"]),
-            ).lastrowid
+            producer_id = connection.execute("INSERT INTO tb_produtores (nome, telefone) VALUES (?, ?)", (dados["produtor"], dados["contato"])).lastrowid
         else:
             producer_id = producer["id_produtor"]
         connection.execute(
@@ -495,16 +387,7 @@ def publicar_produto():
                 (id_produtor, id_categoria, nome, quantidade, unidade, preco, foto_produto, foto_ficha)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                producer_id,
-                category_id,
-                dados["produto"],
-                dados["quantidade"],
-                dados["unidade"],
-                dados["preco"],
-                foto_produto,
-                None,
-            ),
+            (producer_id, category_id, dados["produto"], dados["quantidade"], dados["unidade"], dados["preco"], foto_produto, None),
         )
     flash("Produto publicado e disponível para consumidores!", "success")
     return redirect(url_for("pagina_inicial"))
