@@ -22,24 +22,36 @@
           <div class="image-placeholder detail-placeholder" aria-hidden="true">🌿</div>
         {% endif %}
       </section>
+
       <section class="product-detail-info">
         <p class="eyebrow">DETALHES DO PRODUTO</p>
         <p class="producer">{{ produto.produtor }}</p>
         <h1>{{ produto.nome }}</h1>
         <div class="product-detail-price">R$ {{ produto.preco }}</div>
+
         <div class="product-detail-facts">
           <div><span>Quantidade</span><strong>{{ produto.quantidade }} {{ produto.unidade }}</strong></div>
           <div><span>Produtor</span><strong>{{ produto.produtor }}</strong></div>
         </div>
+
+        <section class="product-description">
+          <h2>Sobre o produto</h2>
+          <p>
+            {{ produto.nome }} é um produto comercializado diretamente por {{ produto.produtor }}.
+            Consulte pelo WhatsApp informações sobre disponibilidade, qualidade, forma de entrega ou retirada e outras características do produto.
+          </p>
+        </section>
+
         {% if produto.contato %}
           {% set telefone = produto.contato|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '')|replace('+', '') %}
           <a class="contact contact-detail" href="https://wa.me/{{ telefone }}?text={{ ('Olá! Encontrei seu anúncio de ' ~ produto.nome ~ ' no Feira Fácil e gostaria de saber mais sobre o produto.')|urlencode }}" target="_blank" rel="noopener noreferrer">💬 Falar no WhatsApp</a>
         {% else %}
           <span class="contact-disabled">Contato indisponível</span>
         {% endif %}
+
         <div class="product-detail-note">
           <strong>Combine diretamente com o produtor</strong>
-          <p>Consulte disponibilidade, retirada e outros detalhes pelo WhatsApp.</p>
+          <p>Use o WhatsApp para confirmar disponibilidade, retirada ou entrega e tirar suas dúvidas.</p>
         </div>
       </section>
     </article>
