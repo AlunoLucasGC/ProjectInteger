@@ -17,7 +17,7 @@
 * { box-sizing: border-box; }
 body { min-width: 320px; margin: 0; background: var(--fundo); color: var(--texto); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; }
 a { color: inherit; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button, .producer-link, .contact, .contact-secondary, .product-image-link, .product-title-link { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid #efb239; outline-offset: 3px; }
 .site-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 12px clamp(20px, 5vw, 72px); background: rgb(255 255 255 / 94%); border-bottom: 1px solid var(--borda); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); }
@@ -71,7 +71,8 @@ button, .producer-link, .contact, .contact-secondary, .product-image-link, .prod
 .form-card .eyebrow { color: var(--verde); }
 .form-card form { display: grid; gap: 11px; margin-top: 8px; }
 .form-card label { font-size: .94rem; font-weight: 750; }
-.form-card input, .form-card select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #afbeb2; border-radius: 10px; background: #fff; color: var(--texto); }
+.form-card input, .form-card select, .form-card textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #afbeb2; border-radius: 10px; background: #fff; color: var(--texto); }
+.form-card textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 .form-card input[type="file"] { padding: 9px; background: #f8faf7; }
 .form-card small { color: var(--texto-suave); }
 .form-card button { margin-top: 8px; }
@@ -97,6 +98,9 @@ details p { margin-bottom: 0; }
 .product-detail-facts div { display: grid; gap: 3px; }
 .product-detail-facts span { color: var(--texto-suave); font-size: .82rem; }
 .product-detail-facts strong { color: var(--texto); }
+.product-description { padding: 16px; background: #f8faf7; border: 1px solid var(--borda); border-radius: 14px; }
+.product-description h2 { margin: 0 0 7px; color: var(--verde-escuro); font-size: 1.05rem; }
+.product-description p { margin: 0; color: var(--texto-suave); line-height: 1.65; white-space: pre-line; }
 .contact-detail { margin-top: 4px; min-height: 50px; font-size: 1rem; }
 .product-detail-note { padding: 16px; background: #f8faf7; border: 1px solid var(--borda); border-radius: 14px; }
 .product-detail-note strong { color: var(--verde-escuro); }
