@@ -293,7 +293,10 @@ def validate_product(form: dict[str, str]) -> tuple[dict[str, str], list[str]]:
 
 
 app = Flask(__name__)
-app.config.update(SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"), MAX_CONTENT_LENGTH=8 * 1024 * 1024)
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao"),
+    MAX_CONTENT_LENGTH=8 * 1024 * 1024,
+)
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 init_database()
 
@@ -319,7 +322,6 @@ def pagina_inicial():
 
 @app.get("/produto/<int:product_id>")
 def detalhes_produto(product_id: int):
-    """Exibe os detalhes de um anúncio específico."""
     with get_connection() as connection:
         produto = connection.execute(
             """
@@ -402,4 +404,4 @@ def excluir_produto(product_id: int):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)
