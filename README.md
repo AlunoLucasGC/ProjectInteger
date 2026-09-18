@@ -252,7 +252,7 @@ O projeto já possui o fluxo principal de cadastro por ficha, OCR, revisão, val
 - [ ] Categorias selecionáveis no cadastro.
 - [ ] Geolocalização e filtros por região.
 - [ ] Fotos próprias dos produtos.
-- [ ] Integração com WhatsApp.
+- [x] Integração com WhatsApp.
 - [ ] Testes automatizados.
 - [ ] Deploy da aplicação.
 - [ ] Migração para PostgreSQL caso a escala do projeto exija.
