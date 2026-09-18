@@ -32,7 +32,7 @@ UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "descricao": "", "quantidade": "", "unidade": "", "preco": ""}
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
 IMAGE_DEFAULT_TIMEOUT: Final = 10
-IMAGE_MIN_SCORE: Final = 55
+IMAGE_MIN_SCORE: Final = 35
 IMAGE_FALLBACK_URL: Final = ""
 
 PHOTO_TRANSLATIONS: Final = {
@@ -197,9 +197,9 @@ def _score_imagem(foto: dict, termo: str) -> int:
     pontuacao = 0
 
     if principal in tokens_contexto:
-        pontuacao += 45
+        pontuacao += 60
     if traducao and _tokens(traducao) & tokens_contexto:
-        pontuacao += 40
+        pontuacao += 45
     if termo in contexto:
         pontuacao += 35
 
@@ -224,10 +224,12 @@ def _score_imagem(foto: dict, termo: str) -> int:
     if "illustration" in tokens_contexto or "logo" in tokens_contexto or "drawing" in tokens_contexto:
         pontuacao -= 40
 
-    # Para produtos conhecidos, exigimos que o nome apareça nos metadados.
-    # Assim uma foto bonita de uma feira não passa como foto de tomate, banana etc.
+    # O nome nem sempre aparece nos metadados do Unsplash, mesmo quando
+    # o produto está realmente visível. Por isso não rejeitamos automaticamente
+    # uma foto apenas por falta do termo; as consultas específicas + penalidades
+    # negativas fazem a seleção.
     if principal in PHOTO_TRANSLATIONS and principal not in tokens_contexto and traducao not in tokens_contexto:
-        return -1000
+        pontuacao -= 15
 
     return pontuacao
 
