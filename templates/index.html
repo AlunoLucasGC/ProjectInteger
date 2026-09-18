@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
-  <header class="site-header"><a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a><a class="producer-link" href="{{ url_for('cadastro') }}">Sou produtor</a></header>
+  <header class="site-header"><a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a><a class="producer-link" href="{{ url_for('registrar', tipo='produtor') }}">Sou produtor</a></header>
   <main class="catalog">
     <section class="hero"><p class="eyebrow">DO CAMPO PARA A SUA MESA</p><h1>Produtos frescos, de quem produz perto de você.</h1><p>Encontre produtores locais e combine a compra diretamente com eles.</p></section>
     <form class="search" action="{{ url_for('pagina_inicial') }}" method="get"><label class="sr-only" for="q">Buscar produtos ou produtores</label><input id="q" name="q" value="{{ busca }}" placeholder="Buscar produtos ou produtores"><button type="submit">Buscar</button></form>
