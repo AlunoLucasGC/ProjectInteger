@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar | Feira Fácil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a>
+    <a class="producer-link" href="{{ url_for('registrar', tipo='produtor') }}">Sou produtor</a>
+  </header>
+
+  <main class="form-page">
+    <a class="back-link" href="{{ url_for('pagina_inicial') }}">← Voltar para o catálogo</a>
+    <section class="form-card">
+      <p class="eyebrow">FEIRA FÁCIL</p>
+      <h1>Entrar</h1>
+      <p>Acesse sua conta para continuar.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <p class="alert {{ category }}">{{ message }}</p>
+        {% endfor %}
+      {% endwith %}
+
+      <form action="{{ url_for('login') }}" method="post">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" required value="{{ email|default('') }}" autocomplete="email">
+
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" required autocomplete="current-password">
+
+        <button type="submit">Entrar</button>
+      </form>
+
+      <p>Ainda não possui conta? <a href="{{ url_for('registrar', tipo='produtor') }}">Cadastrar como produtor</a></p>
+    </section>
+  </main>
+</body>
+</html>
