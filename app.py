@@ -31,6 +31,9 @@ DOCUMENT_EXTENSIONS: Final = {"jpg", "jpeg", "png", "webp", "pdf"}
 UNITS: Final = {"KG", "G", "L", "ML", "UN", "CX", "DZ", "MAÇO"}
 EMPTY_PRODUCT: Final = {"produto": "", "descricao": "", "quantidade": "", "unidade": "", "preco": ""}
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
+IMAGE_DEFAULT_TIMEOUT: Final = 10
+IMAGE_MIN_SCORE: Final = 55
+IMAGE_FALLBACK_URL: Final = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=1200&q=80"
 
 PHOTO_TRANSLATIONS: Final = {
     "tomate": "tomato", "tomates": "tomato", "banana": "banana", "bananas": "banana",
@@ -156,8 +159,68 @@ def _tokens(texto: str) -> set[str]:
     }
 
 
+def _produto_principal(termo: str) -> str:
+    """Retorna o ingrediente/produto principal para a consulta de imagens."""
+    tokens = _tokens(termo)
+    for token in tokens:
+        if token in PHOTO_TRANSLATIONS:
+            return token
+    return termo
+
+
+def _consultas_imagem(termo: str) -> list[str]:
+    principal = _produto_principal(termo)
+    traducao = PHOTO_TRANSLATIONS.get(principal, principal)
+    consultas = [
+        f"{traducao} fresh produce isolated",
+        f"{traducao} single product",
+        f"{traducao} fresh",
+        f"{traducao} vegetable" if principal not in {"banana", "maca", "laranja", "limao", "uva", "manga", "mamao", "abacaxi", "melancia", "morango"} else f"{traducao} fruit",
+    ]
+    if termo != principal:
+        consultas.insert(0, f"{termo} fresh produce")
+    return list(dict.fromkeys(consultas))
+
+
+def _score_imagem(foto: dict, termo: str) -> int:
+    principal = _produto_principal(termo)
+    traducao = PHOTO_TRANSLATIONS.get(principal, principal)
+    alt = str(foto.get("alt_description") or "")
+    descricao = str(foto.get("description") or "")
+    tags = " ".join(
+        str(tag.get("title") or "")
+        for tag in foto.get("tags", [])
+        if isinstance(tag, dict)
+    )
+    contexto = _normalizar_termo_imagem(f"{alt} {descricao} {tags}")
+    tokens_contexto = _tokens(contexto)
+    pontuacao = 0
+
+    if principal in tokens_contexto:
+        pontuacao += 45
+    if traducao and _tokens(traducao) & tokens_contexto:
+        pontuacao += 40
+    if termo in contexto:
+        pontuacao += 35
+
+    palavras_bom_contexto = {
+        "fresh", "produce", "vegetable", "fruit", "food", "harvest",
+        "market", "organic", "raw", "farm", "agriculture", "ingredient",
+    }
+    pontuacao += 5 * len(palavras_bom_contexto & tokens_contexto)
+
+    for negativo in NEGATIVE_TERMS.get(principal, set()):
+        if negativo in tokens_contexto:
+            pontuacao -= 45
+
+    if "illustration" in tokens_contexto or "logo" in tokens_contexto or "drawing" in tokens_contexto:
+        pontuacao -= 30
+
+    return pontuacao
+
+
 def buscar_foto_produto(product_name: str) -> str | None:
-    """Busca uma imagem do próprio produto e rejeita composições pouco relevantes."""
+    """Busca uma foto que represente o produto, priorizando o item em si."""
     termo = _normalizar_termo_imagem(product_name)
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
     if not termo or not access_key:
@@ -169,14 +232,9 @@ def buscar_foto_produto(product_name: str) -> str | None:
         app.logger.error("requests não está instalado. Execute pip install -r requirements.txt.")
         return None
 
-    tokens_produto = _tokens(termo)
-    traducoes = [PHOTO_TRANSLATIONS[token] for token in tokens_produto if token in PHOTO_TRANSLATIONS]
-    consultas = [f'"{termo}" isolated', f'"{termo}" fresh', termo]
-    consultas.extend(f'"{traducao}" isolated' for traducao in traducoes)
-    consultas.extend(f'"{traducao}" fresh' for traducao in traducoes)
-
     melhor_url: str | None = None
-    melhor_pontuacao = -999
+    melhor_pontuacao = -1
+    consultas = _consultas_imagem(termo)
 
     for consulta in consultas:
         try:
@@ -189,7 +247,7 @@ def buscar_foto_produto(product_name: str) -> str | None:
                     "content_filter": "high",
                 },
                 headers={"Authorization": f"Client-ID {access_key}"},
-                timeout=10,
+                timeout=IMAGE_DEFAULT_TIMEOUT,
             )
             response.raise_for_status()
             resultados = response.json().get("results", [])
@@ -198,38 +256,24 @@ def buscar_foto_produto(product_name: str) -> str | None:
             continue
 
         for foto in resultados:
-            alt = str(foto.get("alt_description") or "")
-            descricao = str(foto.get("description") or "")
-            tags = " ".join(
-                str(tag.get("title") or "")
-                for tag in foto.get("tags", [])
-                if isinstance(tag, dict)
-            )
-            contexto = f"{alt} {descricao} {tags}"
-            tokens_contexto = _tokens(contexto)
-            pontuacao = len(tokens_produto & tokens_contexto) * 20
-            for traducao in traducoes:
-                if _tokens(traducao) & tokens_contexto:
-                    pontuacao += 30
-            if termo in _normalizar_termo_imagem(f"{alt} {descricao}"):
-                pontuacao += 25
-            if "isolated" in tokens_contexto:
-                pontuacao += 20
-            if "fresh" in tokens_contexto:
-                pontuacao += 5
-            for negativo in NEGATIVE_TERMS.get(termo, set()):
-                if negativo in tokens_contexto or negativo in contexto:
-                    pontuacao -= 35
-            if not alt and not descricao and not tags:
-                pontuacao -= 15
-
+            pontuacao = _score_imagem(foto, termo)
             url = (foto.get("urls") or {}).get("regular")
             if url and pontuacao > melhor_pontuacao:
                 melhor_pontuacao = pontuacao
                 melhor_url = url
 
-    if melhor_url and melhor_pontuacao >= 20:
+        if melhor_pontuacao >= IMAGE_MIN_SCORE:
+            break
+
+    if melhor_url and melhor_pontuacao >= IMAGE_MIN_SCORE:
+        app.logger.info("Imagem escolhida para '%s' com pontuação %s.", product_name, melhor_pontuacao)
         return melhor_url
+
+    app.logger.warning(
+        "Nenhuma imagem suficientemente precisa encontrada para '%s'. Pontuação máxima: %s",
+        product_name,
+        melhor_pontuacao,
+    )
     return None
 
 
@@ -800,6 +844,8 @@ def publicar_produto():
 
     user = current_user()
     foto_produto = buscar_foto_produto(dados["produto"])
+    if not foto_produto:
+        foto_produto = IMAGE_FALLBACK_URL
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
@@ -831,10 +877,16 @@ def publicar_produto():
 def excluir_produto(product_id: int):
     user = current_user()
     with get_connection() as connection:
+        row = connection.execute(
+            "SELECT foto_produto FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
+            (product_id, user["id_produtor"]),
+        ).fetchone()
         deleted = connection.execute(
             "DELETE FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
             (product_id, user["id_produtor"]),
         ).rowcount
+    if deleted and row and row["foto_produto"] and not str(row["foto_produto"]).startswith("http"):
+        (UPLOAD_FOLDER / str(row["foto_produto"])).unlink(missing_ok=True)
     flash(
         "Produto excluído do seu catálogo." if deleted else "Produto não encontrado no seu catálogo.",
         "success" if deleted else "error",
