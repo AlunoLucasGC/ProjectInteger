@@ -232,33 +232,28 @@ def _score_imagem(foto: dict, termo: str) -> int:
     return pontuacao
 
 
-def buscar_foto_produto(product_name: str) -> str | None:
-    """Busca uma foto que represente o produto, priorizando o item em si."""
+def buscar_fotos_produto(product_name: str, limite: int = 3) -> list[str]:
+    """Busca até três fotos diferentes e suficientemente precisas para o produto."""
     termo = _normalizar_termo_imagem(product_name)
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
     if not termo or not access_key:
-        app.logger.warning("Busca de imagem indisponível: produto ou chave ausente.")
-        return None
+        app.logger.warning("Busca de imagens indisponível: produto ou chave ausente.")
+        return []
     try:
         import requests
     except ImportError:
         app.logger.error("requests não está instalado. Execute pip install -r requirements.txt.")
-        return None
+        return []
 
-    melhor_url: str | None = None
+    imagens: list[str] = []
+    urls_vistas: set[str] = set()
     melhor_pontuacao = -1000
-    consultas = _consultas_imagem(termo)
 
-    for consulta in consultas:
+    for consulta in _consultas_imagem(termo):
         try:
             response = requests.get(
                 UNSPLASH_API_URL,
-                params={
-                    "query": consulta,
-                    "per_page": 30,
-                    "orientation": "squarish",
-                    "content_filter": "high",
-                },
+                params={"query": consulta, "per_page": 30, "orientation": "squarish", "content_filter": "high"},
                 headers={"Authorization": f"Client-ID {access_key}"},
                 timeout=IMAGE_DEFAULT_TIMEOUT,
             )
@@ -268,26 +263,32 @@ def buscar_foto_produto(product_name: str) -> str | None:
             app.logger.warning("Falha na busca de imagem %r: %s", consulta, error)
             continue
 
+        candidatos = []
         for foto in resultados:
-            pontuacao = _score_imagem(foto, termo)
             url = (foto.get("urls") or {}).get("regular")
-            if url and pontuacao > melhor_pontuacao:
-                melhor_pontuacao = pontuacao
-                melhor_url = url
+            if not url or url in urls_vistas:
+                continue
+            pontuacao = _score_imagem(foto, termo)
+            candidatos.append((pontuacao, url))
 
-        if melhor_pontuacao >= IMAGE_MIN_SCORE:
+        for pontuacao, url in sorted(candidatos, reverse=True):
+            if pontuacao < IMAGE_MIN_SCORE:
+                continue
+            imagens.append(url)
+            urls_vistas.add(url)
+            melhor_pontuacao = max(melhor_pontuacao, pontuacao)
+            if len(imagens) >= limite:
+                break
+        if len(imagens) >= limite:
             break
 
-    if melhor_url and melhor_pontuacao >= IMAGE_MIN_SCORE:
-        app.logger.info("Imagem escolhida para '%s' com pontuação %s.", product_name, melhor_pontuacao)
-        return melhor_url
+    app.logger.info("Encontradas %s imagem(ns) para '%s'. Melhor pontuação: %s", len(imagens), product_name, melhor_pontuacao)
+    return imagens
 
-    app.logger.warning(
-        "Nenhuma imagem suficientemente precisa encontrada para '%s'. Pontuação máxima: %s",
-        product_name,
-        melhor_pontuacao,
-    )
-    return None
+
+def buscar_foto_produto(product_name: str) -> str | None:
+    imagens = buscar_fotos_produto(product_name, limite=1)
+    return imagens[0] if imagens else None
 
 
 def melhorar_imagem(caminho: Path):
@@ -820,12 +821,32 @@ def executar_ocr():
     user = current_user()
     dados["produtor"] = user["produtor_nome"]
     dados["contato"] = user["produtor_telefone"] or ""
-    return render_template("resultado.html", dados=dados, texto=texto, imagem="")
+    imagens = buscar_fotos_produto(dados["produto"]) if dados["produto"] else []
+    return render_template("resultado.html", dados=dados, texto=texto, imagem="", imagens=imagens)
 
 
-@app.post("/publicar")
+@app.post("/buscar-imagens")
 @producer_required
-def publicar_produto():
+def buscar_imagens():
+    produto = request.form.get("produto", "").strip()
+    if not produto:
+        flash("Informe o nome do produto para buscar imagens.", "error")
+        return redirect(url_for("cadastro"))
+    imagens = buscar_fotos_produto(produto)
+    user = current_user()
+    dados = {
+        "produto": produto,
+        "quantidade": request.form.get("quantidade", ""),
+        "unidade": request.form.get("unidade", "KG"),
+        "preco": request.form.get("preco", ""),
+        "descricao": request.form.get("descricao", ""),
+        "produtor": user["produtor_nome"],
+        "contato": user["produtor_telefone"] or "",
+    }
+    return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem="", imagens=imagens)
+
+
+@marker
     dados, errors = validate_product(request.form)
     if errors:
         for error in errors:
@@ -841,7 +862,9 @@ def publicar_produto():
         ), 400
 
     user = current_user()
-    foto_produto = buscar_foto_produto(dados["produto"])
+    foto_produto = request.form.get("imagem_selecionada", "").strip()
+    if not foto_produto:
+        foto_produto = buscar_foto_produto(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
@@ -868,9 +891,40 @@ def publicar_produto():
     return redirect(url_for("painel_produtor"))
 
 
-@app.post("/produtos/<int:product_id>/excluir")
+@app.post("/produtos/<int:product_id>/imagens")
 @producer_required
-def excluir_produto(product_id: int):
+def escolher_imagem_produto(product_id: int):
+    user = current_user()
+    with get_connection() as connection:
+        produto = connection.execute(
+            "SELECT id_produto AS id, nome, foto_produto AS imagem FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
+            (product_id, user["id_produtor"]),
+        ).fetchone()
+    if produto is None:
+        flash("Produto não encontrado no seu catálogo.", "error")
+        return redirect(url_for("painel_produtor"))
+    imagens = buscar_fotos_produto(produto["nome"])
+    return render_template("escolher_imagem.html", produto=produto, imagens=imagens)
+
+
+@app.post("/produtos/<int:product_id>/imagem")
+@producer_required
+def atualizar_imagem_produto(product_id: int):
+    user = current_user()
+    imagem = request.form.get("imagem_selecionada", "").strip()
+    if not imagem.startswith("https://images.unsplash.com/"):
+        flash("Selecione uma imagem válida do Unsplash.", "error")
+        return redirect(url_for("painel_produtor"))
+    with get_connection() as connection:
+        changed = connection.execute(
+            "UPDATE tb_produtos SET foto_produto = ? WHERE id_produto = ? AND id_produtor = ?",
+            (imagem, product_id, user["id_produtor"]),
+        ).rowcount
+    flash("Imagem do produto atualizada!", "success" if changed else "error")
+    return redirect(url_for("painel_produtor"))
+
+
+@delMarker
     user = current_user()
     with get_connection() as connection:
         row = connection.execute(
