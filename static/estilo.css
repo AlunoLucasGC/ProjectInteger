@@ -114,3 +114,11 @@ details p { margin-bottom: 0; }
 
 .producer-link-inline { color: inherit; text-decoration: none; }
 .producer-link-inline:hover { color: var(--verde-escuro); text-decoration: underline; }
+
+.image-choice-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:16px 0 24px; }
+.image-choice { display:block; cursor:pointer; border:2px solid transparent; border-radius:12px; overflow:hidden; background:#fff; }
+.image-choice:has(input:checked) { border-color:#165c46; }
+.image-choice input { margin:10px; }
+.image-choice img { display:block; width:100%; aspect-ratio:1; object-fit:cover; }
+.image-choice span { display:block; padding:10px; font-weight:600; }
+@media (max-width:700px) { .image-choice-grid { grid-template-columns:1fr; } }
