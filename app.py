@@ -33,7 +33,7 @@ EMPTY_PRODUCT: Final = {"produto": "", "descricao": "", "quantidade": "", "unida
 UNSPLASH_API_URL: Final = "https://api.unsplash.com/search/photos"
 IMAGE_DEFAULT_TIMEOUT: Final = 10
 IMAGE_MIN_SCORE: Final = 55
-IMAGE_FALLBACK_URL: Final = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=1200&q=80"
+IMAGE_FALLBACK_URL: Final = ""
 
 PHOTO_TRANSLATIONS: Final = {
     "tomate": "tomato", "tomates": "tomato", "banana": "banana", "bananas": "banana",
@@ -172,9 +172,9 @@ def _consultas_imagem(termo: str) -> list[str]:
     principal = _produto_principal(termo)
     traducao = PHOTO_TRANSLATIONS.get(principal, principal)
     consultas = [
-        f"{traducao} fresh produce isolated",
-        f"{traducao} single product",
-        f"{traducao} fresh",
+        f"{traducao} single {traducao} isolated on white background",
+        f"one {traducao} isolated",
+        f"{traducao} fresh whole",
         f"{traducao} vegetable" if principal not in {"banana", "maca", "laranja", "limao", "uva", "manga", "mamao", "abacaxi", "melancia", "morango"} else f"{traducao} fruit",
     ]
     if termo != principal:
@@ -205,16 +205,29 @@ def _score_imagem(foto: dict, termo: str) -> int:
 
     palavras_bom_contexto = {
         "fresh", "produce", "vegetable", "fruit", "food", "harvest",
-        "market", "organic", "raw", "farm", "agriculture", "ingredient",
+        "organic", "raw", "farm", "agriculture", "ingredient",
     }
     pontuacao += 5 * len(palavras_bom_contexto & tokens_contexto)
 
+    # Evita fotos genéricas de bancas/feiras, pratos prontos e composições.
+    termos_genericos = {
+        "market", "stall", "stand", "display", "assortment", "variety",
+        "many", "basket", "baskets", "table", "shelf", "store", "shop",
+        "salad", "dish", "plate", "recipe", "cooked", "meal",
+    }
+    pontuacao -= 20 * len(termos_genericos & tokens_contexto)
+
     for negativo in NEGATIVE_TERMS.get(principal, set()):
         if negativo in tokens_contexto:
-            pontuacao -= 45
+            pontuacao -= 60
 
     if "illustration" in tokens_contexto or "logo" in tokens_contexto or "drawing" in tokens_contexto:
-        pontuacao -= 30
+        pontuacao -= 40
+
+    # Para produtos conhecidos, exigimos que o nome apareça nos metadados.
+    # Assim uma foto bonita de uma feira não passa como foto de tomate, banana etc.
+    if principal in PHOTO_TRANSLATIONS and principal not in tokens_contexto and traducao not in tokens_contexto:
+        return -1000
 
     return pontuacao
 
@@ -233,7 +246,7 @@ def buscar_foto_produto(product_name: str) -> str | None:
         return None
 
     melhor_url: str | None = None
-    melhor_pontuacao = -1
+    melhor_pontuacao = -1000
     consultas = _consultas_imagem(termo)
 
     for consulta in consultas:
@@ -828,7 +841,7 @@ def publicar_produto():
         ), 400
 
     user = current_user()
-    foto_produto = buscar_foto_produto(dados["produto"]) or IMAGE_FALLBACK_URL
+    foto_produto = buscar_foto_produto(dados["produto"])
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
