@@ -16,7 +16,7 @@
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
       {% endwith %}
-      <form id="buscar-imagens-form" action="{{ url_for('buscar_imagens') }}" method="post" style="margin-bottom:16px;">
+      <form id="buscar-imagens-form" action="{{ url_for('buscar_imagens') }}" method="post">
         <input type="hidden" name="produto" id="busca-produto">
         <input type="hidden" name="quantidade" id="busca-quantidade">
         <input type="hidden" name="unidade" id="busca-unidade">
@@ -33,12 +33,13 @@
           document.getElementById('busca-descricao').value = document.getElementById('descricao').value;
         }
       </script>
-      <button type="submit" form="buscar-imagens-form" onclick="prepararBuscaImagens()">🔎 Buscar outras imagens</button>
 
       <form action="{{ url_for('publicar_produto') }}" method="post">
         <input type="hidden" name="texto" value="{{ texto }}">
         <label for="produto">Produto</label>
         <input id="produto" name="produto" value="{{ dados.produto }}" maxlength="100" required>
+        <button type="submit" form="buscar-imagens-form" onclick="prepararBuscaImagens()">🔎 Buscar imagens para este produto</button>
+        <small>O Unsplash fornece sugestões. Escolha a foto que realmente corresponde ao seu produto.</small>
         <div class="field-row">
           <div><label for="quantidade">Quantidade</label><input id="quantidade" name="quantidade" value="{{ dados.quantidade }}" inputmode="decimal" required></div>
           <div><label for="unidade">Unidade</label><select id="unidade" name="unidade" required>{% for unidade in ['KG', 'G', 'L', 'ML', 'UN', 'CX', 'DZ', 'MAÇO'] %}<option value="{{ unidade }}" {% if dados.unidade == unidade %}selected{% endif %}>{{ unidade }}</option>{% endfor %}</select></div>
@@ -46,6 +47,7 @@
         <label for="preco">Preço (R$)</label>
         <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
         <label for="imagem_selecionada">Imagem do produto</label>
+        <small>Selecione uma das opções abaixo antes de publicar.</small>
         {% if imagens %}
           <div class="image-choice-grid">
             {% for imagem_candidata in imagens %}
