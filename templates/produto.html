@@ -25,7 +25,7 @@
 
       <section class="product-detail-info">
         <p class="eyebrow">DETALHES DO PRODUTO</p>
-        <p class="producer">{{ produto.produtor }}</p>
+        <p class="producer"><a class="producer-link-inline" href="{{ url_for('perfil_produtor_publico', producer_id=produto.produtor_id) }}">{{ produto.produtor }}</a></p>
         <h1>{{ produto.nome }}</h1>
         <div class="product-detail-price">R$ {{ produto.preco }}</div>
 
