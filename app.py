@@ -843,9 +843,7 @@ def publicar_produto():
         ), 400
 
     user = current_user()
-    foto_produto = buscar_foto_produto(dados["produto"])
-    if not foto_produto:
-        foto_produto = IMAGE_FALLBACK_URL
+    foto_produto = buscar_foto_produto(dados["produto"]) or IMAGE_FALLBACK_URL
     with get_connection() as connection:
         category_id = connection.execute(
             "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
