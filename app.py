@@ -926,7 +926,9 @@ def atualizar_imagem_produto(product_id: int):
     return redirect(url_for("painel_produtor"))
 
 
-@delMarker
+@app.post("/produtos/<int:product_id>/excluir")
+@producer_required
+def excluir_produto(product_id: int):
     user = current_user()
     with get_connection() as connection:
         row = connection.execute(
