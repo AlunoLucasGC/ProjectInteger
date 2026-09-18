@@ -53,6 +53,9 @@
                 <h3><a class="product-title-link" href="{{ url_for('detalhes_produto', product_id=produto.id) }}">{{ produto.nome }}</a></h3>
                 <p>{{ produto.quantidade }} {{ produto.unidade }}</p>
                 <strong>R$ {{ produto.preco }}</strong>
+                <form action="{{ url_for('escolher_imagem_produto', product_id=produto.id) }}" method="post" style="margin-bottom:8px;">
+                  <button type="submit" class="producer-link">🔄 Atualizar imagem</button>
+                </form>
                 <form action="{{ url_for('excluir_produto', product_id=produto.id) }}" method="post">
                   <button class="delete-product" type="submit" onclick="return confirm('Deseja excluir este produto?');">Excluir produto</button>
                 </form>
