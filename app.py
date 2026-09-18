@@ -846,7 +846,9 @@ def buscar_imagens():
     return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem="", imagens=imagens)
 
 
-@marker
+@app.post("/publicar")
+@producer_required
+def publicar_produto():
     dados, errors = validate_product(request.form)
     if errors:
         for error in errors:
