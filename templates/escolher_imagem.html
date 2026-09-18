@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escolher imagem | Feira Fácil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <main class="form-page">
+    <a class="back-link" href="{{ url_for('painel_produtor') }}">← Voltar ao painel</a>
+    <section class="form-card">
+      <p class="eyebrow">IMAGEM DO PRODUTO</p>
+      <h1>Escolha uma imagem para {{ produto.nome }}</h1>
+      <p>Selecione uma das opções encontradas para este produto.</p>
+      {% if imagens %}
+        <form action="{{ url_for('atualizar_imagem_produto', product_id=produto.id) }}" method="post">
+          <div class="image-choice-grid">
+            {% for imagem in imagens %}
+              <label class="image-choice">
+                <input type="radio" name="imagem_selecionada" value="{{ imagem }}" {% if loop.first %}checked{% endif %}>
+                <img src="{{ imagem }}" alt="Opção {{ loop.index }} para {{ produto.nome }}" loading="lazy">
+                <span>Escolher imagem {{ loop.index }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          <button type="submit">✓ Salvar imagem escolhida</button>
+        </form>
+      {% else %}
+        <p class="alert error">Não encontramos imagens suficientemente precisas para este produto.</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
