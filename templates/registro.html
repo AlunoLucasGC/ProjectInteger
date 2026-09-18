@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feira Fácil | Cadastro de {{ "produtor" if tipo == "produtor" else "consumidor" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a>
+    <a class="producer-link" href="{{ url_for('login') }}">Entrar</a>
+  </header>
+
+  <main class="form-page">
+    <a class="back-link" href="{{ url_for('pagina_inicial') }}">← Voltar para o catálogo</a>
+
+    <section class="form-card">
+      <p class="eyebrow">FEIRA FÁCIL</p>
+      <h1>{{ "Cadastro de produtor" if tipo == "produtor" else "Criar conta" }}</h1>
+      {% if tipo == "produtor" %}
+        <p>Cadastre seus dados para começar a vender. Seu cadastro será analisado pelo administrador antes da aprovação.</p>
+      {% else %}
+        <p>Crie sua conta para acessar o Feira Fácil.</p>
+      {% endif %}
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <p class="alert {{ category }}">{{ message }}</p>
+        {% endfor %}
+      {% endwith %}
+
+      <form action="{{ url_for('registrar', tipo=tipo) }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="tipo" value="{{ tipo }}">
+
+        <label for="nome">Nome</label>
+        <input id="nome" name="nome" type="text" maxlength="100" required value="{{ form.get('nome', '') if form else '' }}" autocomplete="name">
+
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" maxlength="150" required value="{{ form.get('email', '') if form else '' }}" autocomplete="email">
+
+        <div class="field-row">
+          <div>
+            <label for="senha">Senha</label>
+            <input id="senha" name="senha" type="password" minlength="6" required autocomplete="new-password">
+          </div>
+          <div>
+            <label for="confirmar_senha">Confirmar senha</label>
+            <input id="confirmar_senha" name="confirmar_senha" type="password" minlength="6" required autocomplete="new-password">
+          </div>
+        </div>
+
+        {% if tipo == "produtor" %}
+          <label for="telefone">Telefone / WhatsApp</label>
+          <input id="telefone" name="telefone" type="tel" maxlength="100" required value="{{ form.get('telefone', '') if form else '' }}" placeholder="(55) 99999-9999" autocomplete="tel">
+
+          <label for="cidade">Cidade</label>
+          <input id="cidade" name="cidade" type="text" maxlength="100" required value="{{ form.get('cidade', '') if form else '' }}" autocomplete="address-level2">
+
+          <label for="documento">Documento para análise</label>
+          <input id="documento" name="documento" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+          <small>Envie JPG, PNG, WEBP ou PDF. O documento será usado para análise do cadastro.</small>
+        {% endif %}
+
+        <button type="submit">{{ "Enviar cadastro de produtor" if tipo == "produtor" else "Criar conta" }}</button>
+      </form>
+
+      <p>Já possui uma conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+    </section>
+  </main>
+</body>
+</html>
