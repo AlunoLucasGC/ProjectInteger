@@ -19,7 +19,7 @@
       <p class="eyebrow">FEIRA FÁCIL</p>
       <h1>{{ "Cadastro de produtor" if tipo == "produtor" else "Criar conta" }}</h1>
       {% if tipo == "produtor" %}
-        <p>Cadastre seus dados para começar a vender. Seu cadastro será analisado pelo administrador antes da aprovação.</p>
+        <p>Cadastre seus dados para começar a vender. Depois do cadastro, você já poderá entrar e publicar seus produtos.</p>
       {% else %}
         <p>Crie sua conta para acessar o Feira Fácil.</p>
       {% endif %}
@@ -30,7 +30,7 @@
         {% endfor %}
       {% endwith %}
 
-      <form action="{{ url_for('registrar', tipo=tipo) }}" method="post" enctype="multipart/form-data">
+      <form action="{{ url_for('registrar', tipo=tipo) }}" method="post">
         <input type="hidden" name="tipo" value="{{ tipo }}">
 
         <label for="nome">Nome</label>
@@ -57,12 +57,9 @@
           <label for="cidade">Cidade</label>
           <input id="cidade" name="cidade" type="text" maxlength="100" required value="{{ form.get('cidade', '') if form else '' }}" autocomplete="address-level2">
 
-          <label for="documento">Documento para análise</label>
-          <input id="documento" name="documento" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
-          <small>Envie JPG, PNG, WEBP ou PDF. O documento será usado para análise do cadastro.</small>
         {% endif %}
 
-        <button type="submit">{{ "Enviar cadastro de produtor" if tipo == "produtor" else "Criar conta" }}</button>
+        <button type="submit">{{ "Cadastrar produtor" if tipo == "produtor" else "Criar conta" }}</button>
       </form>
 
       <p>Já possui uma conta? <a href="{{ url_for('login') }}">Entrar</a></p>
