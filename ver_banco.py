@@ -32,23 +32,42 @@ def print_rows(rows: list[sqlite3.Row]) -> None:
 
     columns = rows[0].keys()
     widths = {
-        column: max(len(column), *(len(str(row[column] if row[column] is not None else "")) for row in rows))
+        column: max(
+            len(column),
+            *(len(str(row[column] if row[column] is not None else "")) for row in rows),
+        )
         for column in columns
     }
     print(" | ".join(column.ljust(widths[column]) for column in columns))
     print("-+-".join("-" * widths[column] for column in columns))
     for row in rows:
-        print(" | ".join(str(row[column] if row[column] is not None else "").ljust(widths[column]) for column in columns))
+        print(
+            " | ".join(
+                str(row[column] if row[column] is not None else "").ljust(
+                    widths[column]
+                )
+                for column in columns
+            )
+        )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Consulta o arquivo SQLite do Feira Fácil.")
+    parser = argparse.ArgumentParser(
+        description="Consulta o arquivo SQLite do Feira Fácil."
+    )
     parser.add_argument("consulta", choices=QUERIES, nargs="?", default="produtos")
-    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="Caminho para o arquivo .db")
+    parser.add_argument(
+        "--database",
+        type=Path,
+        default=DEFAULT_DATABASE,
+        help="Caminho para o arquivo .db",
+    )
     args = parser.parse_args()
 
     if not args.database.is_file():
-        parser.error(f"Banco não encontrado: {args.database}. Inicie a aplicação primeiro com 'python app.py'.")
+        parser.error(
+            f"Banco não encontrado: {args.database}. Inicie a aplicação primeiro com 'python app.py'."
+        )
 
     with sqlite3.connect(args.database) as connection:
         connection.row_factory = sqlite3.Row
