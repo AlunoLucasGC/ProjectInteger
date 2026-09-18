@@ -470,9 +470,6 @@ def producer_required(view):
         if user["tipo"] != "produtor":
             flash("Esta área é exclusiva para produtores.", "error")
             return redirect(url_for("pagina_inicial"))
-        if user["status"] != "aprovado":
-            flash("Seu cadastro de produtor ainda não foi aprovado.", "error")
-            return redirect(url_for("perfil"))
         return view(*args, **kwargs)
 
     return wrapped
@@ -633,7 +630,6 @@ def registrar():
     confirmar = request.form.get("confirmar_senha", "")
     telefone = request.form.get("telefone", "").strip()
     cidade = request.form.get("cidade", "").strip()
-    documento = request.files.get("documento")
     errors: list[str] = []
 
     if not nome or len(nome) > 100:
@@ -649,10 +645,6 @@ def registrar():
             errors.append("Informe um telefone ou WhatsApp.")
         if not cidade or len(cidade) > 100:
             errors.append("Informe a cidade.")
-        if documento is None or not documento.filename:
-            errors.append("Envie um documento para análise do cadastro.")
-        elif not allowed_document(documento.filename):
-            errors.append("O documento deve ser JPG, PNG, WEBP ou PDF.")
 
     if errors:
         for error in errors:
@@ -668,7 +660,7 @@ def registrar():
                 return render_template("registro.html", tipo=tipo, form=request.form), 409
 
             producer_id = None
-            status = "aprovado" if tipo == "consumidor" else "pendente"
+            status = "aprovado"
             documento_nome = None
 
             if tipo == "produtor":
@@ -679,10 +671,6 @@ def registrar():
                     """,
                     (nome, telefone, email, cidade),
                 ).lastrowid
-                original = secure_filename(documento.filename)
-                documento_nome = f"{uuid.uuid4().hex}_{original}"
-                documento.save(DOCUMENT_FOLDER / documento_nome)
-
             connection.execute(
                 """
                 INSERT INTO tb_usuarios
@@ -704,10 +692,7 @@ def registrar():
         return render_template("registro.html", tipo=tipo, form=request.form), 409
 
     if tipo == "produtor":
-        flash(
-            "Cadastro enviado! Seu perfil ficará pendente até a aprovação do administrador.",
-            "success",
-        )
+        flash("Cadastro realizado! Agora você já pode entrar como produtor.", "success")
     else:
         flash("Cadastro realizado! Agora você já pode entrar.", "success")
     return redirect(url_for("login"))
