@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel do Produtor | Feira Fácil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('pagina_inicial') }}">🌱 Feira Fácil</a>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span>{{ user.nome }}</span>
+      <a class="producer-link" href="{{ url_for('logout') }}">Sair</a>
+    </div>
+  </header>
+
+  <main class="catalog">
+    <section class="hero">
+      <p class="eyebrow">ÁREA DO PRODUTOR</p>
+      <h1>Olá, {{ user.nome }}!</h1>
+      <p>Gerencie seus produtos e publique novas ofertas para os consumidores.</p>
+    </section>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <p class="alert {{ category }}" style="margin-top:24px;">{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
+
+    <section style="margin-top:32px;">
+      <div class="section-heading">
+        <h2>Meus produtos</h2>
+        <span>{{ produtos|length }} produto{{ '' if produtos|length == 1 else 's' }}</span>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <a class="producer-link" href="{{ url_for('cadastro') }}">📷 Publicar produto com foto</a>
+      </div>
+
+      {% if produtos %}
+        <div class="product-grid">
+          {% for produto in produtos %}
+            <article class="product-card">
+              <a class="product-image-link" href="{{ url_for('detalhes_produto', product_id=produto.id) }}">
+                {% if produto.imagem %}
+                  <img src="{{ produto.imagem if produto.imagem.startswith('http') else url_for('upload', nome=produto.imagem) }}" alt="Foto de {{ produto.nome }}" loading="lazy">
+                {% else %}
+                  <div class="image-placeholder" aria-hidden="true">🌿</div>
+                {% endif %}
+              </a>
+              <div class="product-body">
+                <h3><a class="product-title-link" href="{{ url_for('detalhes_produto', product_id=produto.id) }}">{{ produto.nome }}</a></h3>
+                <p>{{ produto.quantidade }} {{ produto.unidade }}</p>
+                <strong>R$ {{ produto.preco }}</strong>
+                <form action="{{ url_for('excluir_produto', product_id=produto.id) }}" method="post">
+                  <button class="delete-product" type="submit" onclick="return confirm('Deseja excluir este produto?');">Excluir produto</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+
+        <form action="{{ url_for('limpar_catalogo') }}" method="post" style="margin-top:24px;">
+          <button class="delete-product" type="submit" onclick="return confirm('Deseja excluir todos os seus produtos?');">Excluir todos os produtos</button>
+        </form>
+      {% else %}
+        <div class="empty-state">
+          <h3>Você ainda não publicou produtos.</h3>
+          <p>Publique sua primeira oferta para ela aparecer no catálogo.</p>
+          <a class="producer-link" href="{{ url_for('cadastro') }}">Cadastrar primeiro produto</a>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
