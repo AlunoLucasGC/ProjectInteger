@@ -16,6 +16,25 @@
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
       {% endwith %}
+      <form id="buscar-imagens-form" action="{{ url_for('buscar_imagens') }}" method="post" style="margin-bottom:16px;">
+        <input type="hidden" name="produto" id="busca-produto">
+        <input type="hidden" name="quantidade" id="busca-quantidade">
+        <input type="hidden" name="unidade" id="busca-unidade">
+        <input type="hidden" name="preco" id="busca-preco">
+        <input type="hidden" name="descricao" id="busca-descricao">
+        <input type="hidden" name="texto" value="{{ texto }}">
+      </form>
+      <script>
+        function prepararBuscaImagens() {
+          document.getElementById('busca-produto').value = document.getElementById('produto').value;
+          document.getElementById('busca-quantidade').value = document.getElementById('quantidade').value;
+          document.getElementById('busca-unidade').value = document.getElementById('unidade').value;
+          document.getElementById('busca-preco').value = document.getElementById('preco').value;
+          document.getElementById('busca-descricao').value = document.getElementById('descricao').value;
+        }
+      </script>
+      <button type="submit" form="buscar-imagens-form" onclick="prepararBuscaImagens()">🔎 Buscar outras imagens</button>
+
       <form action="{{ url_for('publicar_produto') }}" method="post">
         <input type="hidden" name="texto" value="{{ texto }}">
         <label for="produto">Produto</label>
@@ -26,6 +45,21 @@
         </div>
         <label for="preco">Preço (R$)</label>
         <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
+        <label for="imagem_selecionada">Imagem do produto</label>
+        {% if imagens %}
+          <div class="image-choice-grid">
+            {% for imagem_candidata in imagens %}
+              <label class="image-choice">
+                <input type="radio" name="imagem_selecionada" value="{{ imagem_candidata }}" {% if loop.first %}checked{% endif %}>
+                <img src="{{ imagem_candidata }}" alt="Opção {{ loop.index }} para {{ dados.produto }}" loading="lazy">
+                <span>Escolher imagem {{ loop.index }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="alert error">Não encontramos uma imagem suficientemente precisa. Você pode publicar sem imagem.</p>
+        {% endif %}
+
         <label for="descricao">Descrição do produto</label>
         <textarea id="descricao" name="descricao" rows="4" maxlength="500" placeholder="Ex.: Tomates frescos, colhidos no dia e cultivados na propriedade.">{{ dados.descricao|default('') }}</textarea>
         <small>Conte um pouco sobre o produto para ajudar o consumidor a conhecê-lo.</small>
