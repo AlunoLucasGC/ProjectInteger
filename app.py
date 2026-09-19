@@ -588,9 +588,10 @@ def organizar_produto(texto: str) -> dict[str, str]:
 
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
-        resultado["unidade"] = (
-            "KG" if quantidade.group(2).upper() in {"K6", "KG"} else quantidade.group(2).upper()
-        )
+        if quantidade.lastindex and quantidade.lastindex >= 2:
+            resultado["unidade"] = quantidade.group(2).upper()
+        else:
+            resultado["unidade"] = "KG"
     elif quantidade_numero:
         # Se o número veio diretamente do campo QUANTIDADE, mantemos a
         # unidade já selecionada na tela (normalmente KG).
