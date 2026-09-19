@@ -13,46 +13,37 @@
       <p class="eyebrow">ETAPA FINAL</p>
       <h1>Revise seu anúncio</h1>
       <p>O OCR pode errar. Ajuste os dados abaixo antes de publicar.</p>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}<p class="alert {{ category }}">{{ message }}</p>{% endfor %}
       {% endwith %}
-      <form id="buscar-imagens-form" action="{{ url_for('buscar_imagens') }}" method="post">
-        <input type="hidden" name="produto" id="busca-produto">
-        <input type="hidden" name="quantidade" id="busca-quantidade">
-        <input type="hidden" name="unidade" id="busca-unidade">
-        <input type="hidden" name="preco" id="busca-preco">
-        <input type="hidden" name="descricao" id="busca-descricao">
-        <input type="hidden" name="texto" value="{{ texto }}">
-      </form>
-      <script>
-        function prepararBuscaImagens() {
-          document.getElementById('busca-produto').value = document.getElementById('produto').value;
-          document.getElementById('busca-quantidade').value = document.getElementById('quantidade').value;
-          document.getElementById('busca-unidade').value = document.getElementById('unidade').value;
-          document.getElementById('busca-preco').value = document.getElementById('preco').value;
-          document.getElementById('busca-descricao').value = document.getElementById('descricao').value;
-        }
-      </script>
 
       <form action="{{ url_for('publicar_produto') }}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="texto" value="{{ texto }}">
+
         <label for="produto">Produto</label>
         <input id="produto" name="produto" value="{{ dados.produto }}" maxlength="100" required>
-        <button type="submit" form="buscar-imagens-form" onclick="prepararBuscaImagens()">🔎 Buscar imagens para este produto</button>
-        <small>O Unsplash fornece sugestões. Escolha a foto que realmente corresponde ao seu produto.</small>
+
         <div class="field-row">
-          <div><label for="quantidade">Quantidade</label><input id="quantidade" name="quantidade" value="{{ dados.quantidade }}" inputmode="decimal" required></div>
-          <div><label for="unidade">Unidade</label><select id="unidade" name="unidade" required>{% for unidade in ['KG', 'G', 'L', 'ML', 'UN', 'CX', 'DZ', 'MAÇO'] %}<option value="{{ unidade }}" {% if dados.unidade == unidade %}selected{% endif %}>{{ unidade }}</option>{% endfor %}</select></div>
+          <div>
+            <label for="quantidade">Quantidade</label>
+            <input id="quantidade" name="quantidade" value="{{ dados.quantidade }}" inputmode="decimal" required>
+          </div>
+          <div>
+            <label for="unidade">Unidade</label>
+            <select id="unidade" name="unidade" required>
+              {% for unidade in ['KG', 'G', 'L', 'ML', 'UN', 'CX', 'DZ', 'MAÇO'] %}
+                <option value="{{ unidade }}" {% if dados.unidade == unidade %}selected{% endif %}>{{ unidade }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
+
         <label for="preco">Preço (R$)</label>
         <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
-        <label for="imagem_selecionada">Imagem do produto</label>
-                <label for="foto_propria">Ou envie sua própria foto</label>
-        <input id="foto_propria" name="foto_propria" type="file" accept="image/jpeg,image/png,image/webp">
-        <small>Você pode usar uma foto tirada pelo celular ou um arquivo do computador. Se enviar uma foto, ela será usada no lugar da imagem do Unsplash.</small>
 
-        <small>Selecione uma das opções abaixo antes de publicar.</small>
-        <p><strong>Ou escolha uma sugestão do Unsplash:</strong></p>
+        <p><strong>Escolha uma imagem para o produto:</strong></p>
+
         {% if imagens %}
           <div class="image-choice-grid">
             {% for imagem_candidata in imagens %}
@@ -63,17 +54,26 @@
               </label>
             {% endfor %}
           </div>
+
+          <small>Selecione uma das sugestões acima ou envie sua própria foto abaixo.</small>
         {% else %}
-          <p class="alert error">Não encontramos uma imagem suficientemente precisa. Você pode publicar sem imagem.</p>
+          <p class="alert error">Não encontramos uma imagem suficientemente precisa. Você pode enviar sua própria foto ou publicar sem imagem.</p>
         {% endif %}
+
+        <label for="foto_propria">Ou envie sua própria foto</label>
+        <input id="foto_propria" name="foto_propria" type="file" accept="image/jpeg,image/png,image/webp">
+        <small>Você pode usar uma foto tirada pelo celular ou um arquivo do computador. Se enviar uma foto, ela será usada no lugar da imagem do Unsplash.</small>
 
         <label for="descricao">Descrição do produto</label>
         <textarea id="descricao" name="descricao" rows="4" maxlength="500" placeholder="Ex.: Tomates frescos, colhidos no dia e cultivados na propriedade.">{{ dados.descricao|default('') }}</textarea>
         <small>Conte um pouco sobre o produto para ajudar o consumidor a conhecê-lo.</small>
+
         <label for="produtor">Nome do produtor</label>
         <input id="produtor" name="produtor" value="{{ dados.produtor|default('') }}" maxlength="100" required>
+
         <label for="contato">Telefone ou WhatsApp</label>
         <input id="contato" name="contato" value="{{ dados.contato|default('') }}" maxlength="100" required>
+
         <button type="submit">✓ Publicar produto</button>
       </form>
     </section>
