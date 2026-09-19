@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+from difflib import SequenceMatcher
 import unicodedata
 import uuid
 from decimal import Decimal, InvalidOperation
@@ -368,9 +369,10 @@ def buscar_foto_produto(product_name: str) -> str | None:
     return imagens[0] if imagens else None
 
 
-# Prepara a imagem da ficha para o OCR.
-# A imagem é convertida para tons de cinza, ampliada, suavizada e
-# transformada em preto e branco para facilitar a leitura dos textos.
+# Prepara a ficha em diferentes versões para o OCR.
+# Para escrita manual, uma única transformação pode apagar ou deformar
+# partes das letras. Por isso testamos a imagem original ampliada,
+# tons de cinza e duas formas de binarização.
 def melhorar_imagem(caminho: Path):
     import cv2
     import numpy as np
@@ -381,17 +383,30 @@ def melhorar_imagem(caminho: Path):
         raise ValueError("Não foi possível ler a imagem enviada.") from error
     if dados.size == 0:
         raise ValueError("A imagem enviada está vazia ou inválida.")
+
     imagem = cv2.imdecode(dados, cv2.IMREAD_COLOR)
     if imagem is None:
         raise ValueError("Não foi possível abrir a imagem enviada. Tente usar JPG, PNG ou WEBP.")
-    cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
-    cinza = cv2.resize(cinza, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
-    _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return binaria
+
+    ampliada = cv2.resize(imagem, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    cinza = cv2.cvtColor(ampliada, cv2.COLOR_BGR2GRAY)
+    suavizada = cv2.GaussianBlur(cinza, (3, 3), 0)
+
+    _, otsu = cv2.threshold(
+        suavizada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    adaptativa = cv2.adaptiveThreshold(
+        suavizada,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        11,
+    )
+
+    return [ampliada, cinza, otsu, adaptativa]
 
 
-@lru_cache(maxsize=1)
 # Cria o leitor do EasyOCR somente uma vez e guarda o resultado em cache.
 # Isso evita carregar o modelo de OCR novamente a cada cadastro.
 @lru_cache(maxsize=1)
@@ -457,40 +472,160 @@ def _extrair_preco(texto: str) -> str:
     return ""
 
 
+# Verifica se uma linha parece conter um determinado rótulo.
+# O OCR pode transformar "PRODUTO" em algo como "PRODUT0".
+# Em vez de exigir igualdade perfeita, usamos uma comparação aproximada.
+def _linha_tem_rotulo(linha: str, rotulo: str) -> bool:
+    esquerda = re.split(r"[:\-]", corrigir_ocr(linha), maxsplit=1)[0]
+    esquerda = re.sub(r"[^A-Z0-9]", "", esquerda)
+    alvo = re.sub(r"[^A-Z0-9]", "", corrigir_ocr(rotulo))
+    if not esquerda or not alvo:
+        return False
+    return SequenceMatcher(None, esquerda[:len(alvo) + 2], alvo).ratio() >= 0.68
+
+
+# Retira o rótulo e devolve somente o valor da linha.
+# Ex.: "PRODUTO: TOMATE" -> "TOMATE".
+def _valor_da_linha(linha: str) -> str:
+    if ":" in linha:
+        return _limpar_valor(linha.split(":", 1)[1])
+    partes = re.split(r"\s+", _limpar_valor(linha), maxsplit=1)
+    return partes[1] if len(partes) == 2 else ""
+
+
+# Procura uma linha com determinado rótulo e, se ela estiver vazia,
+# tenta usar a linha seguinte. Isso ajuda quando o OCR quebra uma linha
+# manuscrita em dois pedaços.
+def _valor_rotulado(linhas: list[str], rotulo: str) -> str:
+    for indice, linha in enumerate(linhas):
+        if not _linha_tem_rotulo(linha, rotulo):
+            continue
+        valor = _valor_da_linha(linha)
+        if valor:
+            return valor
+        if indice + 1 < len(linhas):
+            proxima = _limpar_valor(linhas[indice + 1])
+            if proxima:
+                return proxima
+    return ""
+
+
+# Converte números manuscritos que o OCR pode confundir.
+# O e Q são exemplos comuns de caracteres que podem parecer zero.
+def _corrigir_numero_ocr(valor: str) -> str:
+    return (
+        valor.upper()
+        .replace("O", "0")
+        .replace("Q", "0")
+        .replace("I", "1")
+        .replace("L", "1")
+    )
+
+
 # Transforma o texto bruto do OCR em um dicionário organizado,
 # contendo produto, quantidade, unidade e preço.
 def organizar_produto(texto: str) -> dict[str, str]:
     resultado = EMPTY_PRODUCT.copy()
     texto = corrigir_ocr(texto)
-    produto = re.search(
-        r"\bPRODUTO\s*:?\s*(.+?)(?=\s+QUANTIDADE\b|\s+PRE(?:Ç|C)O\b|$)",
-        texto,
-        re.IGNORECASE | re.DOTALL,
-    )
+
+    linhas = [
+        _limpar_valor(linha)
+        for linha in texto.splitlines()
+        if _limpar_valor(linha)
+    ]
+
+    valor_produto = _valor_rotulado(linhas, "PRODUTO")
+    valor_quantidade = _valor_rotulado(linhas, "QUANTIDADE")
+    valor_preco = _valor_rotulado(linhas, "PREÇO")
+
+    if valor_produto:
+        resultado["produto"] = _limpar_valor(valor_produto).title()
+
     quantidade = re.search(
-        r"\bQUANTIDADE\s*:?\s*(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
-        texto,
+        r"([0-9OQIL]+(?:[.,][0-9OQIL]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
+        _corrigir_numero_ocr(valor_quantidade),
         re.IGNORECASE,
     )
-    if produto:
-        resultado["produto"] = _limpar_valor(produto.group(1)).title()
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
-    resultado["preco"] = _extrair_preco(texto)
+
+    if valor_preco:
+        resultado["preco"] = _extrair_preco(
+            _corrigir_numero_ocr(valor_preco)
+        )
+
     return resultado
 
 
-# Executa todo o processo de OCR: carrega o leitor, prepara a imagem,
-# lê os textos e organiza os dados encontrados.
+# Dá uma nota ao resultado encontrado. Preferimos a versão do OCR que
+# conseguiu identificar mais campos da ficha.
+def _pontuar_resultado(resultado: dict[str, str]) -> int:
+    pontos = 0
+    if resultado["produto"]:
+        pontos += 3
+    if resultado["quantidade"]:
+        pontos += 2
+    if resultado["unidade"]:
+        pontos += 1
+    if resultado["preco"]:
+        pontos += 2
+    return pontos
+
+
+# Executa o OCR em várias versões da mesma foto.
+# Depois compara os resultados e mantém o que conseguiu identificar
+# mais campos da ficha.
 def extract_data_from_image(caminho: Path) -> tuple[dict[str, str], str]:
     inicio = perf_counter()
     leitor = get_ocr_reader()
-    imagem = melhorar_imagem(caminho)
-    textos = leitor.readtext(imagem, detail=0, paragraph=True)
-    texto = "\n".join(textos)
-    app.logger.info("OCR concluído em %.2f s", perf_counter() - inicio)
-    return organizar_produto(texto), texto
+    imagens = melhorar_imagem(caminho)
+
+    melhor_resultado = EMPTY_PRODUCT.copy()
+    melhor_texto = ""
+
+    for indice, imagem in enumerate(imagens, start=1):
+        deteccoes = leitor.readtext(
+            imagem,
+            detail=1,
+            paragraph=False,
+        )
+
+        # EasyOCR retorna caixa, texto e confiança. Ordenamos pelas
+        # posições da imagem para reconstruir a ordem das linhas.
+        deteccoes = sorted(
+            deteccoes,
+            key=lambda item: (
+                min(ponto[1] for ponto in item[0]),
+                min(ponto[0] for ponto in item[0]),
+            ),
+        )
+
+        textos = [
+            str(item[1]).strip()
+            for item in deteccoes
+            if str(item[1]).strip()
+        ]
+        texto_candidato = "\n".join(textos)
+        resultado = organizar_produto(texto_candidato)
+
+        if _pontuar_resultado(resultado) > _pontuar_resultado(melhor_resultado):
+            melhor_resultado = resultado
+            melhor_texto = texto_candidato
+
+        app.logger.info(
+            "OCR versão %s: %s | resultado=%s",
+            indice,
+            texto_candidato.replace("\n", " | "),
+            resultado,
+        )
+
+    app.logger.info(
+        "OCR concluído em %.2f s. Melhor resultado: %s",
+        perf_counter() - inicio,
+        melhor_resultado,
+    )
+    return melhor_resultado, melhor_texto
 
 
 # Valida os dados antes de permitir que um produto seja salvo no banco.
