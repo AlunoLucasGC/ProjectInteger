@@ -455,20 +455,31 @@ def _normalizar_preco(valor: str) -> str:
         return ""
 
 
-# Procura no texto reconhecido pelo OCR um trecho que pareça ser um preço.
+# Procura no texto reconhecido um trecho que pareça ser um preço.
+# Aceita tanto a linha completa ("PREÇO: R$ 20,00") quanto somente
+# o valor ("R$ 20,00"), porque o OCR pode separar o rótulo do valor.
 def _extrair_preco(texto: str) -> str:
+    texto = corrigir_ocr(texto)
+
     padroes = [
-        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)(?:\s*R\s*\$?)?\b",
-        r"\bPRE(?:Ç|C)O\s*:?\s*(?:R\s*\$\s*)?([0-9OQ]+)[OQ](?:\s*R\s*\$?)?\b",
+        r"(?:PRE(?:Ç|C)O\s*:?\s*)?(?:R\s*\$\s*)?([0-9OQ]+(?:[.,][0-9OQ]+)?)\s*(?:R\s*\$)?",
     ]
+
     for padrao in padroes:
         encontrado = re.search(padrao, texto, re.IGNORECASE)
         if not encontrado:
             continue
-        bruto = encontrado.group(1).upper().replace("O", "0").replace("Q", "0")
+
+        bruto = (
+            encontrado.group(1)
+            .upper()
+            .replace("O", "0")
+            .replace("Q", "0")
+        )
         preco = _normalizar_preco(bruto)
         if preco:
             return preco
+
     return ""
 
 
@@ -541,11 +552,23 @@ def organizar_produto(texto: str) -> dict[str, str]:
     if valor_produto:
         resultado["produto"] = _limpar_valor(valor_produto).title()
 
+    texto_numerico = _corrigir_numero_ocr(valor_quantidade)
+
     quantidade = re.search(
-        r"([0-9OQIL]+(?:[.,][0-9OQIL]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
-        _corrigir_numero_ocr(valor_quantidade),
+        r"([0-9]+(?:[.,][0-9]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
+        texto_numerico,
         re.IGNORECASE,
     )
+
+    # Se o rótulo "QUANTIDADE" não foi reconhecido junto do valor,
+    # fazemos uma segunda tentativa usando o texto inteiro do OCR.
+    if not quantidade:
+        quantidade = re.search(
+            r"\b([0-9]+(?:[.,][0-9]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
+            _corrigir_numero_ocr(texto),
+            re.IGNORECASE,
+        )
+
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
         resultado["unidade"] = quantidade.group(2).upper()
@@ -554,6 +577,17 @@ def organizar_produto(texto: str) -> dict[str, str]:
         resultado["preco"] = _extrair_preco(
             _corrigir_numero_ocr(valor_preco)
         )
+
+    # Segunda tentativa para preço: mesmo que o OCR não tenha associado
+    # corretamente o valor ao rótulo, procuramos um valor monetário no texto.
+    if not resultado["preco"]:
+        preco_fallback = re.search(
+            r"R\s*\$?\s*([0-9]+(?:[.,][0-9]+)?)",
+            _corrigir_numero_ocr(texto),
+            re.IGNORECASE,
+        )
+        if preco_fallback:
+            resultado["preco"] = _normalizar_preco(preco_fallback.group(1))
 
     return resultado
 
