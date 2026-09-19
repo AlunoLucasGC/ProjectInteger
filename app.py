@@ -1097,8 +1097,19 @@ def escolher_imagem_produto(product_id: int):
 def atualizar_imagem_produto(product_id: int):
     user = current_user()
     imagem = request.form.get("imagem_selecionada", "").strip()
-    if not imagem.startswith("https://images.unsplash.com/"):
-        flash("Selecione uma imagem válida do Unsplash.", "error")
+    foto_upload = request.files.get("foto_propria")
+
+    if foto_upload and foto_upload.filename:
+        if not allowed_file(foto_upload.filename):
+            flash("A foto própria deve ser JPG, JPEG, PNG ou WEBP.", "error")
+            return redirect(url_for("painel_produtor"))
+        nome_seguro = secure_filename(foto_upload.filename)
+        nome_unico = f"{uuid.uuid4().hex}_{nome_seguro}"
+        caminho_foto = UPLOAD_FOLDER / nome_unico
+        foto_upload.save(caminho_foto)
+        imagem = nome_unico
+    elif not imagem.startswith("https://images.unsplash.com/"):
+        flash("Selecione uma imagem válida do Unsplash ou envie uma foto própria.", "error")
         return redirect(url_for("painel_produtor"))
     with get_connection() as connection:
         changed = connection.execute(
