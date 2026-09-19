@@ -554,14 +554,23 @@ def organizar_produto(texto: str) -> dict[str, str]:
 
     texto_numerico = _corrigir_numero_ocr(valor_quantidade)
 
+    # Primeiro tentamos encontrar quantidade + unidade no valor que ficou
+    # associado ao rótulo QUANTIDADE.
     quantidade = re.search(
         r"([0-9]+(?:[.,][0-9]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
         texto_numerico,
         re.IGNORECASE,
     )
 
-    # Se o rótulo "QUANTIDADE" não foi reconhecido junto do valor,
-    # fazemos uma segunda tentativa usando o texto inteiro do OCR.
+    # Se o OCR reconheceu somente o número (por exemplo, "5") e deixou
+    # a unidade em outra parte da ficha, aceitamos o número sozinho.
+    quantidade_numero = re.search(
+        r"\b([0-9]+(?:[.,][0-9]+)?)\b",
+        texto_numerico,
+        re.IGNORECASE,
+    )
+
+    # Segunda tentativa: procura quantidade + unidade no texto inteiro.
     if not quantidade:
         quantidade = re.search(
             r"\b([0-9]+(?:[.,][0-9]+)?)\s*(KG|G|ML|L|UN|CX|DZ|MAÇO)\b",
@@ -569,9 +578,24 @@ def organizar_produto(texto: str) -> dict[str, str]:
             re.IGNORECASE,
         )
 
+    # Algumas escritas manuscritas fazem o OCR ler "K6" em vez de "KG".
+    if not quantidade:
+        quantidade = re.search(
+            r"\b([0-9]+(?:[.,][0-9]+)?)\s*K[6G]\b",
+            _corrigir_numero_ocr(texto),
+            re.IGNORECASE,
+        )
+
     if quantidade:
         resultado["quantidade"] = quantidade.group(1).replace(",", ".")
-        resultado["unidade"] = quantidade.group(2).upper()
+        resultado["unidade"] = (
+            "KG" if quantidade.group(2).upper() in {"K6", "KG"} else quantidade.group(2).upper()
+        )
+    elif quantidade_numero:
+        # Se o número veio diretamente do campo QUANTIDADE, mantemos a
+        # unidade já selecionada na tela (normalmente KG).
+        resultado["quantidade"] = quantidade_numero.group(1).replace(",", ".")
+        resultado["unidade"] = "KG"
 
     if valor_preco:
         resultado["preco"] = _extrair_preco(
@@ -998,346 +1022,3 @@ def registrar():
                 (nome, email, senha_hash, tipo, id_produtor, status, documento)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    nome,
-                    email,
-                    generate_password_hash(senha),
-                    tipo,
-                    producer_id,
-                    status,
-                    documento_nome,
-                ),
-            )
-    except sqlite3.IntegrityError:
-        flash("Não foi possível concluir o cadastro. O e-mail pode já estar em uso.", "error")
-        return render_template("registro.html", tipo=tipo, form=request.form), 409
-
-    if tipo == "produtor":
-        flash("Cadastro realizado! Agora você já pode entrar como produtor.", "success")
-    else:
-        flash("Cadastro realizado! Agora você já pode entrar.", "success")
-    return redirect(url_for("login"))
-
-
-# Mostra o perfil do usuário logado.
-# Para produtores, também carrega os produtos cadastrados por ele.
-@app.get("/perfil")
-@login_required
-def perfil():
-    user = current_user()
-    if user["tipo"] == "produtor":
-        with get_connection() as connection:
-            produtos = connection.execute(
-                """
-                SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
-                       printf('%.2f', p.preco) AS preco, p.foto_produto AS imagem
-                FROM tb_produtos p
-                WHERE p.id_produtor = ?
-                ORDER BY p.id_produto DESC
-                """,
-                (user["id_produtor"],),
-            ).fetchall()
-        return render_template("perfil.html", user=user, produtos=produtos)
-    return render_template("perfil.html", user=user, produtos=[])
-
-
-# =========================
-# ÁREA DO PRODUTOR
-# =========================
-
-# Painel privado onde o produtor visualiza seu catálogo.
-@app.get("/painel")
-@producer_required
-def painel_produtor():
-    user = current_user()
-    with get_connection() as connection:
-        produtos = connection.execute(
-            """
-            SELECT p.id_produto AS id, p.nome, p.quantidade, p.unidade,
-                   printf('%.2f', p.preco) AS preco, p.foto_produto AS imagem
-            FROM tb_produtos p
-            WHERE p.id_produtor = ?
-            ORDER BY p.id_produto DESC
-            """,
-            (user["id_produtor"],),
-        ).fetchall()
-    return render_template("painel_produtor.html", user=user, produtos=produtos)
-
-
-# Área administrativa para listar produtores.
-@app.get("/admin/produtores")
-@admin_required
-def admin_produtores():
-    with get_connection() as connection:
-        produtores = connection.execute(
-            """
-            SELECT u.id_usuario, u.nome, u.email, u.status, u.documento,
-                   u.data_cadastro, p.id_produtor, p.telefone, p.cidade
-            FROM tb_usuarios u
-            JOIN tb_produtores p ON p.id_produtor = u.id_produtor
-            WHERE u.tipo = 'produtor'
-            ORDER BY
-                CASE u.status WHEN 'pendente' THEN 0 WHEN 'rejeitado' THEN 1 ELSE 2 END,
-                u.data_cadastro DESC
-            """
-        ).fetchall()
-    return render_template("admin_produtores.html", produtores=produtores)
-
-
-# Permite ao administrador alterar o status de um produtor.
-# Essa parte permanece no sistema para futuras necessidades administrativas.
-@app.post("/admin/produtores/<int:user_id>/<status>")
-@admin_required
-def atualizar_status_produtor(user_id: int, status: str):
-    if status not in {"aprovado", "rejeitado"}:
-        flash("Status inválido.", "error")
-        return redirect(url_for("admin_produtores"))
-    with get_connection() as connection:
-        changed = connection.execute(
-            """
-            UPDATE tb_usuarios
-            SET status = ?
-            WHERE id_usuario = ? AND tipo = 'produtor'
-            """,
-            (status, user_id),
-        ).rowcount
-    flash(
-        "Produtor aprovado com sucesso." if status == "aprovado" else "Produtor rejeitado.",
-        "success" if changed else "error",
-    )
-    return redirect(url_for("admin_produtores"))
-
-
-# Abre a tela de cadastro/publicação de produto.
-@app.get("/cadastro")
-@producer_required
-def cadastro():
-    return render_template("cadastro.html")
-
-
-# Recebe a ficha enviada pelo produtor e executa o OCR.
-@app.post("/ler")
-@producer_required
-def executar_ocr():
-    imagem: FileStorage | None = request.files.get("imagem")
-    if not imagem or not imagem.filename:
-        flash("Selecione uma imagem da ficha para continuar.", "error")
-        return redirect(url_for("cadastro"))
-    if not allowed_file(imagem.filename):
-        flash("Envie uma imagem JPG, JPEG, PNG ou WEBP.", "error")
-        return redirect(url_for("cadastro"))
-    nome = secure_filename(imagem.filename)
-    caminho = UPLOAD_FOLDER / f"{uuid.uuid4().hex}_{nome}"
-        # Salva temporariamente a ficha enviada para que o OCR possa lê-la.
-    imagem.save(caminho)
-    try:
-                # O resultado contém os campos identificados e também o texto bruto do OCR.
-        dados, texto = extract_data_from_image(caminho)
-    except (RuntimeError, ValueError, OSError) as error:
-        app.logger.exception("Falha ao processar imagem para OCR")
-        flash(str(error), "error")
-        return redirect(url_for("cadastro"))
-    finally:
-                # A ficha original é temporária e é apagada depois do processamento.
-        caminho.unlink(missing_ok=True)
-    user = current_user()
-    dados["produtor"] = user["produtor_nome"]
-    dados["contato"] = user["produtor_telefone"] or ""
-    imagens = buscar_fotos_produto(dados["produto"]) if dados["produto"] else []
-        # Mostra a tela onde o produtor pode revisar os dados e escolher a foto.
-    return render_template("resultado.html", dados=dados, texto=texto, imagem="", imagens=imagens)
-
-
-# Faz uma nova busca de imagens usando o nome do produto corrigido/editado
-# pelo produtor na tela de revisão.
-@app.post("/buscar-imagens")
-@producer_required
-def buscar_imagens():
-    produto = request.form.get("produto", "").strip()
-    if not produto:
-        flash("Informe o nome do produto para buscar imagens.", "error")
-        return redirect(url_for("cadastro"))
-    imagens = buscar_fotos_produto(produto)
-    user = current_user()
-    dados = {
-        "produto": produto,
-        "quantidade": request.form.get("quantidade", ""),
-        "unidade": request.form.get("unidade", "KG"),
-        "preco": request.form.get("preco", ""),
-        "descricao": request.form.get("descricao", ""),
-        "produtor": user["produtor_nome"],
-        "contato": user["produtor_telefone"] or "",
-    }
-    return render_template("resultado.html", dados=dados, texto=request.form.get("texto", ""), imagem="", imagens=imagens)
-
-
-# Salva definitivamente o produto no banco.
-# O produtor pode escolher uma das imagens encontradas ou, se nenhuma
-# for escolhida, o sistema tenta buscar uma imagem automaticamente.
-@app.post("/publicar")
-@producer_required
-def publicar_produto():
-    dados, errors = validate_product(request.form)
-    if errors:
-        for error in errors:
-            flash(error, "error")
-        user = current_user()
-        dados["produtor"] = user["produtor_nome"]
-        dados["contato"] = user["produtor_telefone"] or ""
-        return render_template(
-            "resultado.html",
-            dados=dados,
-            texto=request.form.get("texto", ""),
-            imagem=request.form.get("imagem", ""),
-        ), 400
-
-    user = current_user()
-    # O produtor pode escolher uma imagem do Unsplash ou enviar uma foto própria.
-    foto_produto = request.form.get("imagem_selecionada", "").strip()
-    foto_upload = request.files.get("foto_propria")
-
-    if foto_upload and foto_upload.filename:
-        # A foto enviada pelo produtor tem prioridade sobre qualquer sugestão.
-        if not allowed_file(foto_upload.filename):
-            flash("A foto própria deve ser JPG, JPEG, PNG ou WEBP.", "error")
-            return render_template(
-                "resultado.html",
-                dados=dados,
-                texto=request.form.get("texto", ""),
-                imagem=foto_produto,
-                imagens=buscar_fotos_produto(dados["produto"]) if dados["produto"] else [],
-            ), 400
-
-        nome_seguro = secure_filename(foto_upload.filename)
-        nome_unico = f"{uuid.uuid4().hex}_{nome_seguro}"
-        caminho_foto = UPLOAD_FOLDER / nome_unico
-        foto_upload.save(caminho_foto)
-        foto_produto = nome_unico
-
-    if not foto_produto:
-        foto_produto = buscar_foto_produto(dados["produto"])
-    with get_connection() as connection:
-                # Todos os produtos novos começam na categoria padrão "Sem categoria".
-        category_id = connection.execute(
-            "SELECT id_categoria FROM tb_categorias WHERE nome = ?", ("Sem categoria",)
-        ).fetchone()["id_categoria"]
-        connection.execute(
-            """
-            INSERT INTO tb_produtos
-            (id_produtor, id_categoria, nome, descricao, quantidade, unidade, preco, foto_produto, foto_ficha)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user["id_produtor"],
-                category_id,
-                dados["produto"],
-                dados["descricao"],
-                dados["quantidade"],
-                dados["unidade"],
-                dados["preco"],
-                foto_produto,
-                None,
-            ),
-        )
-    flash("Produto publicado e disponível para consumidores!", "success")
-    return redirect(url_for("painel_produtor"))
-
-
-# Abre a tela para trocar a imagem de um produto já publicado.
-@app.post("/produtos/<int:product_id>/imagens")
-@producer_required
-def escolher_imagem_produto(product_id: int):
-    user = current_user()
-    with get_connection() as connection:
-        produto = connection.execute(
-            "SELECT id_produto AS id, nome, foto_produto AS imagem FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
-            (product_id, user["id_produtor"]),
-        ).fetchone()
-    if produto is None:
-        flash("Produto não encontrado no seu catálogo.", "error")
-        return redirect(url_for("painel_produtor"))
-    imagens = buscar_fotos_produto(produto["nome"])
-    return render_template("escolher_imagem.html", produto=produto, imagens=imagens)
-
-
-# Salva a imagem escolhida pelo produtor para um produto existente.
-@app.post("/produtos/<int:product_id>/imagem")
-@producer_required
-def atualizar_imagem_produto(product_id: int):
-    user = current_user()
-    imagem = request.form.get("imagem_selecionada", "").strip()
-    foto_upload = request.files.get("foto_propria")
-
-    if foto_upload and foto_upload.filename:
-        if not allowed_file(foto_upload.filename):
-            flash("A foto própria deve ser JPG, JPEG, PNG ou WEBP.", "error")
-            return redirect(url_for("painel_produtor"))
-        nome_seguro = secure_filename(foto_upload.filename)
-        nome_unico = f"{uuid.uuid4().hex}_{nome_seguro}"
-        caminho_foto = UPLOAD_FOLDER / nome_unico
-        foto_upload.save(caminho_foto)
-        imagem = nome_unico
-    elif not imagem.startswith("https://images.unsplash.com/"):
-        flash("Selecione uma imagem válida do Unsplash ou envie uma foto própria.", "error")
-        return redirect(url_for("painel_produtor"))
-    with get_connection() as connection:
-        changed = connection.execute(
-            "UPDATE tb_produtos SET foto_produto = ? WHERE id_produto = ? AND id_produtor = ?",
-            (imagem, product_id, user["id_produtor"]),
-        ).rowcount
-    flash("Imagem do produto atualizada!", "success" if changed else "error")
-    return redirect(url_for("painel_produtor"))
-
-
-# Exclui um produto pertencente ao produtor logado.
-@app.post("/produtos/<int:product_id>/excluir")
-@producer_required
-def excluir_produto(product_id: int):
-    user = current_user()
-    with get_connection() as connection:
-        row = connection.execute(
-            "SELECT foto_produto FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
-            (product_id, user["id_produtor"]),
-        ).fetchone()
-        deleted = connection.execute(
-            "DELETE FROM tb_produtos WHERE id_produto = ? AND id_produtor = ?",
-            (product_id, user["id_produtor"]),
-        ).rowcount
-    if deleted and row and row["foto_produto"] and not str(row["foto_produto"]).startswith("http"):
-        (UPLOAD_FOLDER / str(row["foto_produto"])).unlink(missing_ok=True)
-    flash(
-        "Produto excluído do seu catálogo." if deleted else "Produto não encontrado no seu catálogo.",
-        "success" if deleted else "error",
-    )
-    return redirect(url_for("painel_produtor"))
-
-
-# Exclui todos os produtos do catálogo do produtor logado.
-@app.post("/produtos/limpar")
-@producer_required
-def limpar_catalogo():
-    user = current_user()
-    with get_connection() as connection:
-        deleted = connection.execute(
-            "DELETE FROM tb_produtos WHERE id_produtor = ?",
-            (user["id_produtor"],),
-        ).rowcount
-    flash(
-        f"Catálogo limpo. {deleted} produto(s) removido(s).",
-        "success",
-    )
-    return redirect(url_for("painel_produtor"))
-
-
-# =========================
-# INICIALIZAÇÃO
-# =========================
-
-# Este bloco só é executado quando rodamos "python app.py".
-# Se o arquivo for importado por outro módulo, o servidor não é iniciado.
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=os.environ.get("FLASK_DEBUG") == "1",
-    )
