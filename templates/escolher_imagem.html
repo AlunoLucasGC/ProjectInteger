@@ -12,9 +12,9 @@
     <section class="form-card">
       <p class="eyebrow">IMAGEM DO PRODUTO</p>
       <h1>Escolha uma imagem para {{ produto.nome }}</h1>
-      <p>Selecione uma das opções encontradas para este produto.</p>
+      <p>Selecione uma sugestão do Unsplash ou envie uma foto própria.</p>
       {% if imagens %}
-        <form action="{{ url_for('atualizar_imagem_produto', product_id=produto.id) }}" method="post">
+        <form action="{{ url_for('atualizar_imagem_produto', product_id=produto.id) }}" method="post" enctype="multipart/form-data">
           <div class="image-choice-grid">
             {% for imagem in imagens %}
               <label class="image-choice">
@@ -24,6 +24,9 @@
               </label>
             {% endfor %}
           </div>
+          <label for="foto_propria">Ou envie sua própria foto</label>
+          <input id="foto_propria" name="foto_propria" type="file" accept="image/jpeg,image/png,image/webp">
+          <small>A foto própria substitui a sugestão escolhida.</small>
           <button type="submit">✓ Salvar imagem escolhida</button>
         </form>
       {% else %}
