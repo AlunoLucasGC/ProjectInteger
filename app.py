@@ -1023,7 +1023,28 @@ def publicar_produto():
         ), 400
 
     user = current_user()
+    # O produtor pode escolher uma imagem do Unsplash ou enviar uma foto própria.
     foto_produto = request.form.get("imagem_selecionada", "").strip()
+    foto_upload = request.files.get("foto_propria")
+
+    if foto_upload and foto_upload.filename:
+        # A foto enviada pelo produtor tem prioridade sobre qualquer sugestão.
+        if not allowed_file(foto_upload.filename):
+            flash("A foto própria deve ser JPG, JPEG, PNG ou WEBP.", "error")
+            return render_template(
+                "resultado.html",
+                dados=dados,
+                texto=request.form.get("texto", ""),
+                imagem=foto_produto,
+                imagens=buscar_fotos_produto(dados["produto"]) if dados["produto"] else [],
+            ), 400
+
+        nome_seguro = secure_filename(foto_upload.filename)
+        nome_unico = f"{uuid.uuid4().hex}_{nome_seguro}"
+        caminho_foto = UPLOAD_FOLDER / nome_unico
+        foto_upload.save(caminho_foto)
+        foto_produto = nome_unico
+
     if not foto_produto:
         foto_produto = buscar_foto_produto(dados["produto"])
     with get_connection() as connection:
