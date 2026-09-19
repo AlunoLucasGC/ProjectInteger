@@ -34,7 +34,7 @@
         }
       </script>
 
-      <form action="{{ url_for('publicar_produto') }}" method="post">
+      <form action="{{ url_for('publicar_produto') }}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="texto" value="{{ texto }}">
         <label for="produto">Produto</label>
         <input id="produto" name="produto" value="{{ dados.produto }}" maxlength="100" required>
@@ -47,7 +47,12 @@
         <label for="preco">Preço (R$)</label>
         <input id="preco" name="preco" value="{{ dados.preco }}" inputmode="decimal" required>
         <label for="imagem_selecionada">Imagem do produto</label>
+                <label for="foto_propria">Ou envie sua própria foto</label>
+        <input id="foto_propria" name="foto_propria" type="file" accept="image/jpeg,image/png,image/webp">
+        <small>Você pode usar uma foto tirada pelo celular ou um arquivo do computador. Se enviar uma foto, ela será usada no lugar da imagem do Unsplash.</small>
+
         <small>Selecione uma das opções abaixo antes de publicar.</small>
+        <p><strong>Ou escolha uma sugestão do Unsplash:</strong></p>
         {% if imagens %}
           <div class="image-choice-grid">
             {% for imagem_candidata in imagens %}
