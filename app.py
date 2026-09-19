@@ -753,7 +753,7 @@ def login():
         return redirect(url_for("admin_produtores"))
     if user["tipo"] == "produtor":
             # Depois da operação, volta para o painel do produtor.
-    return redirect(url_for("painel_produtor"))
+        return redirect(url_for("painel_produtor"))
     return redirect(url_for("perfil"))
 
 
